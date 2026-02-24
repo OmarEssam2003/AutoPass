@@ -1,5 +1,5 @@
-node_modules/
-backend/.env
-*.log
-dist/
-coverage/
+# Ignore ALL .env files anywhere in the project
+.env
+.env.*
+!.env.example           # But keep the example file
+!.env.sample
