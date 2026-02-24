@@ -1,5 +1,6 @@
-# Ignore ALL .env files anywhere in the project
+# Add these lines
 .env
+backend/.env
+**/.env
 .env.*
-!.env.example           # But keep the example file
-!.env.sample
+!.env.example
