@@ -414,6 +414,46 @@ const options = {
           },
         },
 
+        // ─── Detection Event Schemas ───────────────────────────────────────
+        DetectionEventResponse: {
+          type: 'object',
+          properties: {
+            event_id:         { type: 'string', format: 'uuid' },
+            gate_id:          { type: 'string', format: 'uuid' },
+            plate_number:     { type: 'string', example: 'ABC 1234' },
+            detected_at:      { type: 'string', format: 'date-time' },
+            snapshot_url:     { type: 'string', example: 'https://cdn.autopass.com/snap.jpg', nullable: true },
+            confidence_score: { type: 'number', example: 97.50, nullable: true },
+            is_duplicate:     { type: 'boolean', example: false },
+            gate_location:    { type: 'string', example: 'North Entrance Gate A' },
+            gate_direction:   { type: 'string', enum: ['IN', 'OUT'] },
+            zone_id:          { type: 'string', format: 'uuid', nullable: true },
+            zone_name:        { type: 'string', example: 'Main Entrance Zone', nullable: true },
+            ticket_created:   { type: 'boolean', example: true },
+            ticket_id:        { type: 'string', format: 'uuid', nullable: true },
+            enforcement_flag: {
+              nullable: true,
+              type: 'object',
+              properties: {
+                enforcement_id: { type: 'string', format: 'uuid' },
+                reason:         { type: 'string', example: 'Vehicle reported stolen' },
+              },
+            },
+            message: { type: 'string', example: 'Detection recorded. Ticket created.' },
+          },
+        },
+        CreateDetectionEventBody: {
+          type: 'object',
+          required: ['gate_id', 'plate_number'],
+          properties: {
+            gate_id:          { type: 'string', format: 'uuid' },
+            plate_number:     { type: 'string', example: 'ABC 1234' },
+            detected_at:      { type: 'string', format: 'date-time', description: 'Defaults to now if omitted' },
+            snapshot_url:     { type: 'string', format: 'uri', nullable: true },
+            confidence_score: { type: 'number', example: 97.50, nullable: true },
+          },
+        },
+
       },
     },
     security: [{ bearerAuth: [] }],
@@ -428,6 +468,7 @@ const options = {
       { name: 'Vehicle Rentals',      description: 'Rental requests between vehicle owners and renters' },
       { name: 'Vehicle Enforcements', description: 'Flag vehicles for enforcement at gates — SUPER_ADMIN and OPERATOR' },
       { name: 'Pricing Rules',        description: 'Zone-based pricing rules per vehicle type — SUPER_ADMIN and OPERATOR' },
+      { name: 'Detection Events',     description: 'ANPR plate detection events posted by gate cameras' },
     ],
   },
   apis: ['./src/modules/**/*.routes.js'],

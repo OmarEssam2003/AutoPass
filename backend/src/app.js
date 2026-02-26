@@ -7,16 +7,17 @@ const morgan  = require('morgan');
 const swaggerUi = require('swagger-ui-express');
 
 const swaggerSpec  = require('./config/swagger');
-const authRoutes        = require('./modules/auth/auth.routes');
-const userRoutes        = require('./modules/users/user.routes');
-const adminRoutes       = require('./modules/admins/admin.routes');
-const zoneRoutes        = require('./modules/zones/zone.routes');
-const gateRoutes        = require('./modules/gates/gate.routes');
-const vehicleRoutes     = require('./modules/vehicles/vehicle.routes');
-const ownershipRoutes   = require('./modules/vehicle-ownerships/vehicleOwnership.routes');
-const rentalRoutes      = require('./modules/vehicle-rentals/vehiclerental.routes');
-const enforcementRoutes = require('./modules/vehicle-enforcements/vehicleenforcement.routes');
-const pricingRuleRoutes  = require('./modules/pricing-rules/pricingrule.routes');
+const authRoutes            = require('./modules/auth/auth.routes');
+const userRoutes            = require('./modules/users/user.routes');
+const adminRoutes           = require('./modules/admins/admin.routes');
+const zoneRoutes            = require('./modules/zones/zone.routes');
+const gateRoutes            = require('./modules/gates/gate.routes');
+const vehicleRoutes         = require('./modules/vehicles/vehicle.routes');
+const ownershipRoutes       = require('./modules/vehicle-ownerships/vehicleOwnership.routes');
+const rentalRoutes          = require('./modules/vehicle-rentals/vehicleRental.routes');
+const enforcementRoutes     = require('./modules/vehicle-enforcements/vehicleEnforcement.routes');
+const pricingRuleRoutes     = require('./modules/pricing-rules/pricingRule.routes');
+const detectionEventRoutes  = require('./modules/detection-events/detectionevent.routes');
 const errorHandler = require('./middlewares/error.middleware');
 const { applyGeneralLimit } = require('./middlewares/rateLimiter.middleware');
 
@@ -108,6 +109,8 @@ app.use('/api/vehicle-ownerships',   ownershipRoutes);
 app.use('/api/vehicle-rentals',      rentalRoutes);
 app.use('/api/vehicle-enforcements', enforcementRoutes);
 app.use('/api/pricing-rules',        pricingRuleRoutes);
+app.use('/api/detection-events',     detectionEventRoutes);
+app.use('/api/gates',  gateRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
