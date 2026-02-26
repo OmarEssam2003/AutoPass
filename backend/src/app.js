@@ -18,6 +18,7 @@ const rentalRoutes          = require('./modules/vehicle-rentals/vehicleRental.r
 const enforcementRoutes     = require('./modules/vehicle-enforcements/vehicleEnforcement.routes');
 const pricingRuleRoutes     = require('./modules/pricing-rules/pricingRule.routes');
 const detectionEventRoutes  = require('./modules/detection-events/detectionevent.routes');
+const ticketRoutes          = require('./modules/tickets/ticket.routes');
 const errorHandler = require('./middlewares/error.middleware');
 const { applyGeneralLimit } = require('./middlewares/rateLimiter.middleware');
 
@@ -110,6 +111,7 @@ app.use('/api/vehicle-rentals',      rentalRoutes);
 app.use('/api/vehicle-enforcements', enforcementRoutes);
 app.use('/api/pricing-rules',        pricingRuleRoutes);
 app.use('/api/detection-events',     detectionEventRoutes);
+app.use('/api/tickets',              ticketRoutes);
 app.use('/api/gates',  gateRoutes);
 
 // Health check endpoint
