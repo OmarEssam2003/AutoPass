@@ -1,4 +1,4 @@
-const ownershipService = require('./vehicle-ownerships.service');
+const ownershipService = require('./vehicleownership.service');
 
 // ── POST /api/vehicle-ownerships ──────────────────────────────────────────────
 const createOwnership = async (req, res, next) => {
