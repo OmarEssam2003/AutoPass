@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AutoPass — Enforcements</title>
+  <link rel="stylesheet" href="../css/dashboard.css"/>
+</head>
+<body>
+<div id="sidebar-container"></div>
+<div class="main">
+  <header class="topbar">
+    <span class="topbar-title">Vehicle Enforcements</span>
+  </header>
+  <div class="page-content">
+    <div class="page-header">
+      <div class="page-header-left">
+        <h1>Vehicle Enforcements</h1>
+        <p>Manage vehicle flags and enforcement types at gates.</p>
+      </div>
+      <button class="btn btn-primary" onclick="openCreate()">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/></svg>
+        Flag Vehicle
+      </button>
+    </div>
+
+    <div class="table-card">
+      <div class="table-card-header">
+        <span class="table-card-title" id="enf-count">Enforcements</span>
+        <div class="table-filters">
+          <input class="filter-input" type="text" id="plate-input" placeholder="Plate number…"/>
+          <select class="filter-select" id="type-filter">
+            <option value="">All types</option>
+            <option value="STOP">STOP</option>
+            <option value="AUTO_BLOCK">AUTO_BLOCK</option>
+            <option value="OBSERVE">OBSERVE</option>
+          </select>
+          <select class="filter-select" id="active-filter">
+            <option value="">All statuses</option>
+            <option value="true">Active</option>
+            <option value="false">Inactive</option>
+          </select>
+          <!-- NEW: filter by who created the enforcement -->
+          <select class="filter-select" id="source-filter">
+            <option value="">All sources</option>
+            <option value="true">User reported</option>
+            <option value="false">Admin created</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="loadEnforcements(1)">Apply</button>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Vehicle</th>
+              <th>Type</th>
+              <th>Priority</th>
+              <th>Reason</th>
+              <th>Status</th>
+              <!-- NEW: who issued the enforcement — admin or user -->
+              <th>Reported By</th>
+              <th>Issued At</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="enf-body">
+            <tr class="loading-row"><td colspan="8"><span class="spinner"></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination" id="enf-pagination"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Create Modal (admin path — unchanged) -->
+<div class="modal-overlay" id="create-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Flag Vehicle</span>
+      <button class="modal-close" onclick="Modal.close('create-modal')">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label class="form-label">Plate Number *</label>
+          <input class="form-input" type="text" id="c-plate" placeholder="ABC 1234"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Enforcement Type *</label>
+          <select class="form-select" id="c-type">
+            <option value="STOP">STOP (Priority 3)</option>
+            <option value="AUTO_BLOCK">AUTO_BLOCK (Priority 2)</option>
+            <option value="OBSERVE">OBSERVE (Priority 1)</option>
+          </select>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Reason *</label>
+          <input class="form-input" type="text" id="c-reason" placeholder="e.g. Reported stolen — police case #123"/>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Notes (optional)</label>
+          <input class="form-input" type="text" id="c-notes" placeholder="Additional context…"/>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="Modal.close('create-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="createEnforcement()">Flag Vehicle</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modal (admin path — unchanged) -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Update Enforcement</span>
+      <button class="modal-close" onclick="Modal.close('edit-modal')">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="e-id"/>
+
+      <!-- Read-only info banner shown when the enforcement was user-reported -->
+      <div id="user-reported-banner" style="display:none;background:var(--amber-soft);border:1px solid #fde68a;border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;font-size:12.5px;color:#92400e">
+        <strong>User-reported stolen car.</strong>
+        This enforcement was submitted by
+        <span id="banner-reporter"></span> via the mobile app.
+        You can edit or delete it below.
+      </div>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Enforcement Type</label>
+          <select class="form-select" id="e-type">
+            <option value="STOP">STOP</option>
+            <option value="AUTO_BLOCK">AUTO_BLOCK</option>
+            <option value="OBSERVE">OBSERVE</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Active</label>
+          <select class="form-select" id="e-active">
+            <option value="true">Active</option>
+            <option value="false">Inactive</option>
+          </select>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Reason</label>
+          <input class="form-input" type="text" id="e-reason"/>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Notes</label>
+          <input class="form-input" type="text" id="e-notes"/>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="Modal.close('edit-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEnforcement()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/sidebar.js"></script>
+<script src="../js/dashboard.js"></script>
+<script>
+let currentPage = 1;
+
+// ── "Reported By" cell ────────────────────────────────────────────────────────
+// Admin-created  → issued_by is set,       reported_by_user_id is NULL
+// User-reported  → reported_by_user_id set, issued_by is NULL
+function reportedByCell(e) {
+  if (e.reported_by_user_id) {
+    // User-reported stolen car — show user name + a distinct badge
+    const name = [e.reported_by_first_name, e.reported_by_last_name].filter(Boolean).join(' ') || 'User';
+    return `
+      <div style="display:flex;align-items:center;gap:6px">
+        <span class="badge badge-amber" style="white-space:nowrap">
+          <svg viewBox="0 0 16 16" fill="currentColor" style="width:10px;height:10px;display:inline;margin-right:2px"><path d="M8 8a3 3 0 100-6 3 3 0 000 6zm-4.5 5a4.5 4.5 0 119 0H3.5z"/></svg>
+          User
+        </span>
+        <span style="font-size:12px">${name}</span>
+      </div>`;
+  }
+  // Admin-created
+  const name = e.issued_by_first_name
+    ? `${e.issued_by_first_name} ${e.issued_by_last_name}`
+    : '—';
+  return `
+    <div style="display:flex;align-items:center;gap:6px">
+      <span class="badge badge-blue" style="white-space:nowrap">
+        <svg viewBox="0 0 16 16" fill="currentColor" style="width:10px;height:10px;display:inline;margin-right:2px"><path d="M8 8a3 3 0 100-6 3 3 0 000 6zm-4.5 5a4.5 4.5 0 119 0H3.5z"/></svg>
+        Admin
+      </span>
+      <span style="font-size:12px">${name}</span>
+    </div>`;
+}
+
+// ── Load enforcements ─────────────────────────────────────────────────────────
+async function loadEnforcements(page = 1) {
+  currentPage = page;
+  const plate        = document.getElementById('plate-input').value.trim();
+  const type         = document.getElementById('type-filter').value;
+  const isActive     = document.getElementById('active-filter').value;
+  const userReported = document.getElementById('source-filter').value;  // NEW
+
+  const params = { page, limit: 20 };
+  if (plate)        params.plate_number     = plate;
+  if (type)         params.enforcement_type = type;
+  if (isActive)     params.is_active        = isActive;
+  if (userReported) params.user_reported    = userReported;  // NEW
+
+  const tbody = document.getElementById('enf-body');
+  tbody.innerHTML = '<tr class="loading-row"><td colspan="8"><span class="spinner"></span></td></tr>';
+
+  try {
+    const data = await Api.get('/vehicle-enforcements' + Api.buildQuery(params));
+    document.getElementById('enf-count').textContent = `Enforcements (${data.meta?.total ?? 0})`;
+
+    if (!data.data?.length) {
+      tbody.innerHTML = '<tr><td colspan="8" class="table-empty">No enforcements found</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = data.data.map(e => `
+      <tr>
+        <td>
+          <div style="font-weight:500;font-family:var(--mono);font-size:13px">${e.plate_number}</div>
+          <div style="font-size:11px;color:var(--text-muted)">${[e.make, e.model, e.color].filter(Boolean).join(' · ')}</div>
+        </td>
+        <td>${statusBadge(e.enforcement_type)}</td>
+        <td>
+          <span class="badge ${e.priority === 3 ? 'badge-red' : e.priority === 2 ? 'badge-amber' : 'badge-blue'}">
+            ${e.priority}
+          </span>
+        </td>
+        <td style="font-size:12px;color:var(--text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          ${e.reason}
+        </td>
+        <td>${e.is_active ? statusBadge('ACTIVE') : statusBadge('INACTIVE')}</td>
+        <td>${reportedByCell(e)}</td>
+        <td style="color:var(--text-muted)">${Fmt.date(e.issued_at)}</td>
+        <td>
+          <div style="display:flex;gap:4px">
+            <button class="btn btn-ghost btn-sm" onclick='openEdit(${JSON.stringify(e).replace(/'/g, "&#39;")})'>Edit</button>
+            <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteEnf('${e.enforcement_id}','${e.plate_number}')">Del</button>
+          </div>
+        </td>
+      </tr>`).join('');
+
+    renderPagination('enf-pagination', data.meta, loadEnforcements);
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="8" class="table-empty">${err.message}</td></tr>`;
+    Toast.error(err.message);
+  }
+}
+
+// ── Create (admin path) ───────────────────────────────────────────────────────
+function openCreate() { Modal.open('create-modal'); }
+
+async function createEnforcement() {
+  const body = {
+    plate_number:     document.getElementById('c-plate').value.trim().toUpperCase(),
+    enforcement_type: document.getElementById('c-type').value,
+    reason:           document.getElementById('c-reason').value.trim(),
+    notes:            document.getElementById('c-notes').value.trim() || undefined,
+  };
+  if (!body.plate_number || !body.reason) {
+    Toast.warning('Plate number and reason are required.');
+    return;
+  }
+  try {
+    await Api.post('/vehicle-enforcements', body);
+    Toast.success('Vehicle flagged successfully.');
+    Modal.close('create-modal');
+    document.getElementById('c-plate').value  = '';
+    document.getElementById('c-reason').value = '';
+    document.getElementById('c-notes').value  = '';
+    loadEnforcements(1);
+  } catch (err) { Toast.error(err.message); }
+}
+
+// ── Edit (admin can edit any enforcement, including user-reported ones) ────────
+function openEdit(e) {
+  document.getElementById('e-id').value     = e.enforcement_id;
+  document.getElementById('e-type').value   = e.enforcement_type;
+  document.getElementById('e-active').value = String(e.is_active);
+  document.getElementById('e-reason').value = e.reason || '';
+  document.getElementById('e-notes').value  = e.notes  || '';
+
+  // Show the amber banner if this was user-reported
+  const banner   = document.getElementById('user-reported-banner');
+  const reporter = document.getElementById('banner-reporter');
+  if (e.reported_by_user_id) {
+    const name = [e.reported_by_first_name, e.reported_by_last_name].filter(Boolean).join(' ') || 'a user';
+    reporter.textContent = name;
+    banner.style.display = 'block';
+  } else {
+    banner.style.display = 'none';
+  }
+
+  Modal.open('edit-modal');
+}
+
+async function saveEnforcement() {
+  const id   = document.getElementById('e-id').value;
+  const body = {
+    enforcement_type: document.getElementById('e-type').value,
+    is_active:        document.getElementById('e-active').value === 'true',
+    reason:           document.getElementById('e-reason').value.trim(),
+    notes:            document.getElementById('e-notes').value.trim() || null,
+  };
+  try {
+    await Api.put(`/vehicle-enforcements/${id}`, body);
+    Toast.success('Enforcement updated.');
+    Modal.close('edit-modal');
+    loadEnforcements(currentPage);
+  } catch (err) { Toast.error(err.message); }
+}
+
+// ── Delete (admin can delete any enforcement) ─────────────────────────────────
+function deleteEnf(id, plate) {
+  confirmAction(
+    'Delete Enforcement',
+    `Remove enforcement flag for plate ${plate}? This cannot be undone.`,
+    async () => {
+      try {
+        await Api.delete(`/vehicle-enforcements/${id}`);
+        Toast.success('Enforcement deleted.');
+        loadEnforcements(currentPage);
+      } catch (err) { Toast.error(err.message); }
+    }
+  );
+}
+
+document.addEventListener('DOMContentLoaded', () => loadEnforcements());
+</script>
+</body>
+</html>

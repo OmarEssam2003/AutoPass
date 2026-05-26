@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AutoPass — Overview</title>
+  <link rel="stylesheet" href="../css/dashboard.css"/>
+  <style>
+    .alert-banner {
+      background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+      border: 1px solid #fca5a5;
+      border-left: 4px solid var(--red);
+      padding: 16px 20px;
+      border-radius: var(--radius-lg);
+      margin-bottom: 20px;
+      display: none;
+      align-items: center;
+      gap: 14px;
+    }
+    .alert-banner.show { display: flex; }
+    .alert-banner-icon {
+      width: 36px; height: 36px;
+      background: var(--red);
+      color: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .alert-banner-text { flex: 1; }
+    .alert-banner-title {
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--red);
+      margin-bottom: 2px;
+    }
+    .alert-banner-msg {
+      font-size: 12.5px;
+      color: var(--text-secondary);
+    }
+    .critical-card {
+      border: 1px solid #fca5a5 !important;
+      background: linear-gradient(180deg, #fef2f2 0%, var(--surface) 30%) !important;
+    }
+    .critical-card .table-card-title { color: var(--red); }
+  </style>
+</head>
+<body>
+<div id="sidebar-container"></div>
+<div class="main">
+  <header class="topbar">
+    <span class="topbar-title">Overview</span>
+    <div class="topbar-actions">
+      <button class="btn btn-secondary btn-sm" onclick="refreshAll()">
+        <svg viewBox="0 0 20 20" fill="currentColor" style="width:13px;height:13px"><path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.989a.75.75 0 00-.75.75v4.242a.75.75 0 001.5 0v-2.43l.31.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.53V2.929a.75.75 0 00-1.5 0v2.43l-.31-.31A7 7 0 003.239 8.188a.75.75 0 101.448.389A5.5 5.5 0 0113.89 6.11l.311.31h-2.432a.75.75 0 000 1.5h4.243a.75.75 0 00.53-.219z" clip-rule="evenodd"/></svg>
+        Refresh
+      </button>
+    </div>
+  </header>
+
+  <div class="page-content">
+    <div class="page-header">
+      <div class="page-header-left">
+        <h1>Dashboard</h1>
+        <p id="welcome-msg">Welcome back. Here's what's happening in your system.</p>
+      </div>
+      <div id="last-updated" style="font-size:12px;color:var(--text-muted);align-self:flex-end"></div>
+    </div>
+
+    <!-- 🚨 Critical alert banner — appears only when there are unread STOLEN_DETECTED alerts -->
+    <div class="alert-banner" id="critical-banner">
+      <div class="alert-banner-icon">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+        </svg>
+      </div>
+      <div class="alert-banner-text">
+        <div class="alert-banner-title" id="critical-banner-title">Stolen vehicle detected</div>
+        <div class="alert-banner-msg" id="critical-banner-msg">—</div>
+      </div>
+      <a href="alerts.html" class="btn btn-primary btn-sm">View All →</a>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-card-header">
+          <span class="stat-label">Total Users</span>
+          <div class="stat-icon" style="background:var(--blue-soft)">
+            <svg viewBox="0 0 20 20" fill="var(--blue)"><path d="M10 8a3 3 0 100-6 3 3 0 000 6zM3.465 14.493a1.23 1.23 0 00.41 1.412A9.957 9.957 0 0010 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 00-13.074.003z"/></svg>
+          </div>
+        </div>
+        <div class="stat-value" id="stat-users"><span class="spinner"></span></div>
+        <div class="stat-change">Registered users</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-card-header">
+          <span class="stat-label">Total Vehicles</span>
+          <div class="stat-icon" style="background:var(--purple-soft)">
+            <svg viewBox="0 0 20 20" fill="var(--purple)"><path d="M6.5 3A1.5 1.5 0 005 4.5v.085A1.5 1.5 0 003.5 6H2a1 1 0 000 2h.25A1.75 1.75 0 004 9.75v3.5A1.75 1.75 0 002.25 15H2a1 1 0 000 2h1a1 1 0 001-1v-.25h12V16a1 1 0 001 1h1a1 1 0 000-2h-.25A1.75 1.75 0 0116 13.25v-3.5A1.75 1.75 0 0117.75 8H18a1 1 0 000-2h-1.5A1.5 1.5 0 0015 4.585V4.5A1.5 1.5 0 0013.5 3h-7z"/></svg>
+          </div>
+        </div>
+        <div class="stat-value" id="stat-vehicles"><span class="spinner"></span></div>
+        <div class="stat-change">Registered plates</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-card-header">
+          <span class="stat-label">Unpaid Tickets</span>
+          <div class="stat-icon" style="background:var(--amber-soft)">
+            <svg viewBox="0 0 20 20" fill="var(--amber)"><path fill-rule="evenodd" d="M2.5 4A1.5 1.5 0 001 5.5V6h18v-.5A1.5 1.5 0 0017.5 4h-15zm18 3H1v7.5A1.5 1.5 0 002.5 16h15a1.5 1.5 0 001.5-1.5V7z" clip-rule="evenodd"/></svg>
+          </div>
+        </div>
+        <div class="stat-value" id="stat-unpaid"><span class="spinner"></span></div>
+        <div class="stat-change">Pending payment</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-card-header">
+          <span class="stat-label">Active Enforcements</span>
+          <div class="stat-icon" style="background:var(--red-soft)">
+            <svg viewBox="0 0 20 20" fill="var(--red)"><path fill-rule="evenodd" d="M9.661 2.237a.531.531 0 01.678 0 11.947 11.947 0 007.078 2.749.5.5 0 01.479.425c.069.52.104 1.05.104 1.589 0 5.162-3.26 9.563-7.834 11.256a.48.48 0 01-.332 0C5.26 16.563 2 12.162 2 7c0-.538.035-1.069.104-1.589a.5.5 0 01.48-.425 11.947 11.947 0 007.077-2.749z" clip-rule="evenodd"/></svg>
+          </div>
+        </div>
+        <div class="stat-value" id="stat-enforcements"><span class="spinner"></span></div>
+        <div class="stat-change">Vehicles flagged</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-card-header">
+          <span class="stat-label">Detection Events</span>
+          <div class="stat-icon" style="background:var(--green-soft)">
+            <svg viewBox="0 0 20 20" fill="var(--green)"><path d="M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z"/><path fill-rule="evenodd" d="M.664 10.59a1.651 1.651 0 010-1.186A10.004 10.004 0 0110 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0110 17c-4.257 0-7.893-2.66-9.336-6.41z" clip-rule="evenodd"/></svg>
+          </div>
+        </div>
+        <div class="stat-value" id="stat-events"><span class="spinner"></span></div>
+        <div class="stat-change">Total camera reads</div>
+      </div>
+
+      <!-- 🆕 NEW: Critical alerts stat — replaces generic "Unread Alerts" -->
+      <div class="stat-card" id="critical-alerts-card">
+        <div class="stat-card-header">
+          <span class="stat-label">Critical Alerts</span>
+          <div class="stat-icon" style="background:var(--red-soft)">
+            <svg viewBox="0 0 20 20" fill="var(--red)"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>
+          </div>
+        </div>
+        <div class="stat-value" id="stat-critical"><span class="spinner"></span></div>
+        <div class="stat-change">Unread critical events</div>
+      </div>
+    </div>
+
+    <!-- Stolen Vehicle Detections — new red-bordered card -->
+    <div class="table-card critical-card" style="margin-bottom:16px">
+      <div class="table-card-header">
+        <span class="table-card-title">🚨 Recent Stolen Vehicle Detections</span>
+        <a href="alerts.html" class="btn btn-ghost btn-sm">View all →</a>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Plate</th>
+              <th>Gate</th>
+              <th>Reason</th>
+              <th>Status</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody id="stolen-detections-body">
+            <tr class="loading-row"><td colspan="5"><span class="spinner"></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Recent data grid -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="table-card">
+        <div class="table-card-header">
+          <span class="table-card-title">Recent Unpaid Tickets</span>
+          <a href="tickets.html" class="btn btn-ghost btn-sm">View all →</a>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Plate</th><th>Gate</th><th>Price</th><th>Issued</th></tr></thead>
+            <tbody id="recent-tickets-body">
+              <tr class="loading-row"><td colspan="4"><span class="spinner"></span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <div class="table-card-header">
+          <span class="table-card-title">Recent Detection Events</span>
+          <a href="detection.html" class="btn btn-ghost btn-sm">View all →</a>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Gate</th><th>Plate</th><th>Decision</th><th>Time</th></tr></thead>
+            <tbody id="recent-events-body">
+              <tr class="loading-row"><td colspan="4"><span class="spinner"></span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-card" style="margin-top:16px">
+      <div class="table-card-header">
+        <span class="table-card-title">Recent Alerts</span>
+        <a href="alerts.html" class="btn btn-ghost btn-sm">View all →</a>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Severity</th><th>Type</th><th>Message</th><th>Read</th><th>Created</th></tr></thead>
+          <tbody id="recent-alerts-body">
+            <tr class="loading-row"><td colspan="5"><span class="spinner"></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../js/sidebar.js"></script>
+<script src="../js/dashboard.js"></script>
+<script>
+const STAT_ENDPOINTS = [
+  { id: 'stat-users',        url: '/users?limit=1' },
+  { id: 'stat-vehicles',     url: '/vehicles?limit=1' },
+  { id: 'stat-unpaid',       url: '/tickets?status=UNPAID&limit=1' },
+  { id: 'stat-enforcements', url: '/vehicle-enforcements?is_active=true&limit=1' },
+  { id: 'stat-events',       url: '/detection-events?limit=1' },
+  { id: 'stat-critical',     url: '/alerts?severity=CRITICAL&is_read=false&limit=1' },
+];
+
+async function loadStats() {
+  await Promise.all(STAT_ENDPOINTS.map(async ({ id, url }) => {
+    const el = document.getElementById(id);
+    try {
+      const data = await Api.get(url);
+      const total = data?.meta?.total;
+      el.textContent = (total !== undefined && total !== null)
+        ? Number(total).toLocaleString()
+        : '0';
+    } catch (err) {
+      console.error(`Stat ${id} failed:`, err.message);
+      el.textContent = '—';
+      el.title = err.message;
+    }
+  }));
+  document.getElementById('last-updated').textContent =
+    `Updated ${new Date().toLocaleTimeString()}`;
+}
+
+function severityBadge(sev) {
+  const s = (sev || 'INFO').toUpperCase();
+  let color = 'badge-blue';
+  if (s === 'CRITICAL') color = 'severity-critical';
+  else if (s === 'WARNING') color = 'severity-warning';
+  return `<span class="badge ${color}" style="${s === 'CRITICAL' ? 'background:var(--red);color:#fff' : s === 'WARNING' ? 'background:var(--amber);color:#fff' : ''}">${s}</span>`;
+}
+
+// ── Stolen Vehicle Detections — driven by alerts of type STOLEN_DETECTED ─────
+async function loadStolenDetections() {
+  const tbody  = document.getElementById('stolen-detections-body');
+  const banner = document.getElementById('critical-banner');
+  try {
+    const data = await Api.get('/alerts?type=STOLEN_DETECTED&limit=5');
+
+    // Show critical banner if there are any unread ones
+    const unread = (data.data || []).filter(a => !a.is_read);
+    if (unread.length > 0) {
+      banner.classList.add('show');
+      const latest = unread[0];
+      document.getElementById('critical-banner-title').textContent =
+        `🚨 ${unread.length} stolen vehicle detection${unread.length > 1 ? 's' : ''} need attention`;
+      document.getElementById('critical-banner-msg').textContent =
+        latest.message || 'See alerts page for details.';
+    } else {
+      banner.classList.remove('show');
+    }
+
+    if (!data.data?.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="table-empty">No stolen vehicle detections — system clear ✓</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.data.map(a => `
+      <tr${!a.is_read ? ' class="alert-row-unread"' : ''}>
+        <td><span class="mono"><strong>${a.vehicle_plate || '—'}</strong></span></td>
+        <td style="font-size:12px;color:var(--text-secondary)">${Fmt.truncate(a.gate_name, 25) || '—'}</td>
+        <td style="font-size:12px;color:var(--text-secondary);max-width:280px">${Fmt.truncate(a.message, 80)}</td>
+        <td>${a.is_read ? statusBadge('TRUE') : `<span class="badge" style="background:var(--red);color:#fff">UNREAD</span>`}</td>
+        <td style="color:var(--text-muted);font-size:12px">${Fmt.datetime(a.created_at)}</td>
+      </tr>`).join('');
+  } catch (err) {
+    console.error('Stolen detections failed:', err.message);
+    tbody.innerHTML = `<tr><td colspan="5" class="table-empty">Error: ${err.message}</td></tr>`;
+  }
+}
+
+async function loadRecentTickets() {
+  const tbody = document.getElementById('recent-tickets-body');
+  try {
+    const data = await Api.get('/tickets?status=UNPAID&limit=5');
+    if (!data.data?.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="table-empty">No unpaid tickets</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.data.map(t => `
+      <tr>
+        <td><span class="mono">${t.plate_number || '—'}</span></td>
+        <td style="font-size:12px;color:var(--text-secondary)">${Fmt.truncate(t.gate_name, 20) || '—'}</td>
+        <td><strong>${Fmt.currency(t.price)}</strong></td>
+        <td style="color:var(--text-muted)">${Fmt.date(t.issued_at)}</td>
+      </tr>`).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="4" class="table-empty">Error: ${err.message}</td></tr>`;
+  }
+}
+
+async function loadRecentEvents() {
+  const tbody = document.getElementById('recent-events-body');
+  try {
+    const data = await Api.get('/detection-events?limit=5');
+    if (!data.data?.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="table-empty">No events</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.data.map(e => `
+      <tr>
+        <td style="font-size:12px">${Fmt.truncate(e.gate_name, 20) || '—'}</td>
+        <td><span class="mono">${e.plate_number || '—'}</span></td>
+        <td>${statusBadge(e.decision || '—')}</td>
+        <td style="color:var(--text-muted)">${Fmt.datetime(e.created_at)}</td>
+      </tr>`).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="4" class="table-empty">Error: ${err.message}</td></tr>`;
+  }
+}
+
+async function loadRecentAlerts() {
+  const tbody = document.getElementById('recent-alerts-body');
+  try {
+    const data = await Api.get('/alerts?limit=5');
+    if (!data.data?.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="table-empty">No alerts</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.data.map(a => `
+      <tr${!a.is_read ? ' style="background:var(--amber-soft)"' : ''}>
+        <td>${severityBadge(a.severity)}</td>
+        <td><span class="badge badge-blue">${a.type || '—'}</span></td>
+        <td style="color:var(--text-secondary);font-size:12px">${Fmt.truncate(a.title || a.message, 50)}</td>
+        <td>${a.is_read ? statusBadge('TRUE') : statusBadge('FALSE')}</td>
+        <td style="color:var(--text-muted)">${Fmt.datetime(a.created_at)}</td>
+      </tr>`).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" class="table-empty">Error: ${err.message}</td></tr>`;
+  }
+}
+
+function refreshAll() {
+  STAT_ENDPOINTS.forEach(({ id }) => {
+    document.getElementById(id).innerHTML = '<span class="spinner"></span>';
+  });
+  loadStats();
+  loadStolenDetections();
+  loadRecentTickets();
+  loadRecentEvents();
+  loadRecentAlerts();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const admin = Auth.getAdmin();
+  if (admin?.first_name) {
+    document.getElementById('welcome-msg').textContent =
+      `Welcome back, ${admin.first_name}. Here's what's happening in your system.`;
+  }
+  loadStats();
+  loadStolenDetections();
+  loadRecentTickets();
+  loadRecentEvents();
+  loadRecentAlerts();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+# Add these lines
+
+backend/.env
+backend/node_modules

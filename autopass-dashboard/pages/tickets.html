@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AutoPass — Tickets</title>
+  <link rel="stylesheet" href="../css/dashboard.css"/>
+</head>
+<body>
+<div id="sidebar-container"></div>
+<div class="main">
+  <header class="topbar">
+    <span class="topbar-title">Tickets</span>
+  </header>
+  <div class="page-content">
+    <div class="page-header">
+      <div class="page-header-left">
+        <h1>Tickets</h1>
+        <p>View and manage auto-generated access tickets.</p>
+      </div>
+    </div>
+
+    <!-- Error banner (hidden by default) -->
+    <div id="error-banner" style="display:none;background:var(--red-soft);border:1px solid #fecaca;border-radius:var(--radius);padding:12px 16px;margin-bottom:16px;color:var(--red);font-size:13px"></div>
+
+    <div class="table-card">
+      <div class="table-card-header">
+        <span class="table-card-title" id="tickets-count">Tickets</span>
+        <div class="table-filters">
+          <input class="filter-input" type="text" id="plate-input" placeholder="Plate number…"/>
+          <select class="filter-select" id="status-filter">
+            <option value="">All statuses</option>
+            <option value="UNPAID">Unpaid</option>
+            <option value="PAID">Paid</option>
+            <option value="DISPUTED">Disputed</option>
+            <option value="CANCELLED">Cancelled</option>
+          </select>
+          <select class="filter-select" id="charged-as-filter">
+            <option value="">Charged as</option>
+            <option value="OWNER">Owner</option>
+            <option value="RENTER">Renter</option>
+            <option value="UNASSIGNED">Unassigned</option>
+          </select>
+          <input class="filter-input" type="date" id="from-filter" style="width:140px"/>
+          <input class="filter-input" type="date" id="to-filter" style="width:140px"/>
+          <button class="btn btn-secondary btn-sm" onclick="loadTickets(1)">Apply</button>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Ticket ID</th>
+              <th>Vehicle</th>
+              <th>Gate</th>
+              <th>Zone</th>
+              <th>Dir.</th>
+              <th>Price</th>
+              <th>Status</th>
+              <th>Charged As</th>
+              <th>Issued</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="tickets-body">
+            <tr class="loading-row"><td colspan="10"><span class="spinner"></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination" id="tickets-pagination"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Ticket Modal -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Update Ticket</span>
+      <button class="modal-close" onclick="Modal.close('edit-modal')">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-ticket-id"/>
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select class="form-select" id="edit-status">
+            <option value="UNPAID">Unpaid</option>
+            <option value="PAID">Paid</option>
+            <option value="DISPUTED">Disputed</option>
+            <option value="CANCELLED">Cancelled</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Price (EGP)</label>
+          <input class="form-input" type="number" id="edit-price" step="0.01" min="0"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Charged As</label>
+          <select class="form-select" id="edit-charged-as">
+            <option value="OWNER">Owner</option>
+            <option value="RENTER">Renter</option>
+            <option value="UNASSIGNED">Unassigned</option>
+          </select>
+        </div>
+      </div>
+      <div id="edit-error" style="display:none;margin-top:12px;background:var(--red-soft);border:1px solid #fecaca;border-radius:var(--radius);padding:10px 12px;color:var(--red);font-size:12.5px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="Modal.close('edit-modal')">Cancel</button>
+      <button class="btn btn-primary" id="save-btn" onclick="saveTicket()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- View Ticket Modal -->
+<div class="modal-overlay" id="view-modal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <span class="modal-title">Ticket Details</span>
+      <button class="modal-close" onclick="Modal.close('view-modal')">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="detail-grid" id="ticket-detail-grid"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="Modal.close('view-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/sidebar.js"></script>
+<script src="../js/dashboard.js"></script>
+<script>
+let currentPage = 1;
+
+function showError(msg) {
+  const banner = document.getElementById('error-banner');
+  banner.textContent = `Error: ${msg}`;
+  banner.style.display = 'block';
+}
+
+function hideError() {
+  document.getElementById('error-banner').style.display = 'none';
+}
+
+async function loadTickets(page = 1) {
+  currentPage = page;
+  hideError();
+
+  const plate     = document.getElementById('plate-input').value.trim();
+  const status    = document.getElementById('status-filter').value;
+  const chargedAs = document.getElementById('charged-as-filter').value;
+  const fromVal   = document.getElementById('from-filter').value;
+  const toVal     = document.getElementById('to-filter').value;
+
+  const params = { page, limit: 20 };
+  if (plate)     params.plate_number = plate;
+  if (status)    params.status       = status;
+  if (chargedAs) params.charged_as   = chargedAs;
+  if (fromVal) {
+    const d = new Date(fromVal); d.setHours(0,0,0,0);
+    params.from = d.toISOString();
+  }
+  if (toVal) {
+    const d = new Date(toVal); d.setHours(23,59,59,999);
+    params.to = d.toISOString();
+  }
+
+  const tbody = document.getElementById('tickets-body');
+  tbody.innerHTML = '<tr class="loading-row"><td colspan="10"><span class="spinner"></span></td></tr>';
+  document.getElementById('tickets-count').textContent = 'Tickets';
+
+  try {
+    const data = await Api.get('/tickets' + Api.buildQuery(params));
+
+    const total = data?.meta?.total ?? 0;
+    document.getElementById('tickets-count').textContent = `Tickets (${total})`;
+
+    if (!data.data?.length) {
+      tbody.innerHTML = '<tr><td colspan="10" class="table-empty">No tickets found</td></tr>';
+      document.getElementById('tickets-pagination').innerHTML = '';
+      return;
+    }
+
+    tbody.innerHTML = data.data.map(t => `
+      <tr>
+        <td><span class="mono" style="font-size:11px">${Fmt.uuid(t.ticket_id)}</span></td>
+        <td>
+          <div style="font-weight:600;font-family:var(--mono);font-size:13px">${t.plate_number || '—'}</div>
+          <div style="font-size:11px;color:var(--text-muted)">${[t.make, t.model].filter(Boolean).join(' ') || ''}</div>
+        </td>
+        <td style="font-size:12px">${Fmt.truncate(t.gate_name, 18) || '—'}</td>
+        <td style="font-size:12px">${t.zone_name || '—'}</td>
+        <td>${t.direction ? statusBadge(t.direction) : '—'}</td>
+        <td><strong>${Fmt.currency(t.price)}</strong></td>
+        <td>${statusBadge(t.status)}</td>
+        <td>${statusBadge(t.charged_as)}</td>
+        <td style="color:var(--text-muted);font-size:12px">${Fmt.date(t.issued_at)}</td>
+        <td>
+          <div style="display:flex;gap:4px">
+            <button class="btn btn-ghost btn-sm" onclick='viewTicket(${JSON.stringify(t).replace(/"/g, "&quot;")})'>View</button>
+            <button class="btn btn-ghost btn-sm" onclick='openEdit(${JSON.stringify(t).replace(/"/g, "&quot;")})'>Edit</button>
+            <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteTicket('${t.ticket_id}','${t.plate_number || t.ticket_id}')">Del</button>
+          </div>
+        </td>
+      </tr>`).join('');
+
+    renderPagination('tickets-pagination', data.meta, loadTickets);
+
+  } catch (err) {
+    console.error('loadTickets error:', err);
+    tbody.innerHTML = `<tr><td colspan="10" class="table-empty">Failed to load tickets</td></tr>`;
+    document.getElementById('tickets-pagination').innerHTML = '';
+    showError(err.message || 'Unknown error loading tickets');
+  }
+}
+
+function viewTicket(t) {
+  document.getElementById('ticket-detail-grid').innerHTML = `
+    <div class="detail-item"><span class="detail-label">Ticket ID</span><span class="detail-value mono" style="font-size:11px">${t.ticket_id}</span></div>
+    <div class="detail-item"><span class="detail-label">Issued At</span><span class="detail-value">${Fmt.datetime(t.issued_at)}</span></div>
+    <div class="detail-item"><span class="detail-label">Plate Number</span><span class="detail-value mono" style="font-weight:700;font-size:16px">${t.plate_number || '—'}</span></div>
+    <div class="detail-item"><span class="detail-label">Vehicle</span><span class="detail-value">${[t.vehicle_type, t.make, t.model, t.color].filter(Boolean).join(' · ') || '—'}</span></div>
+    <div class="detail-item"><span class="detail-label">Gate</span><span class="detail-value">${t.gate_name || '—'}</span></div>
+    <div class="detail-item"><span class="detail-label">Direction</span><span class="detail-value">${t.gate_direction || t.direction || '—'}</span></div>
+    <div class="detail-item"><span class="detail-label">Zone</span><span class="detail-value">${t.zone_name || '—'}</span></div>
+    <div class="detail-item"><span class="detail-label">Price</span><span class="detail-value" style="font-size:20px;font-weight:700">${Fmt.currency(t.price)}</span></div>
+    <div class="detail-item"><span class="detail-label">Status</span><span class="detail-value">${statusBadge(t.status)}</span></div>
+    <div class="detail-item"><span class="detail-label">Charged As</span><span class="detail-value">${statusBadge(t.charged_as)}</span></div>
+    <div class="detail-item"><span class="detail-label">Charged To</span><span class="detail-value">${t.charged_user_first_name ? `${t.charged_user_first_name} ${t.charged_user_last_name}` : '—'}</span></div>
+    <div class="detail-item"><span class="detail-label">Email</span><span class="detail-value">${t.charged_user_email || '—'}</span></div>`;
+  Modal.open('view-modal');
+}
+
+function openEdit(t) {
+  document.getElementById('edit-ticket-id').value  = t.ticket_id;
+  document.getElementById('edit-status').value     = t.status;
+  document.getElementById('edit-price').value      = t.price ?? '';
+  document.getElementById('edit-charged-as').value = t.charged_as;
+  document.getElementById('edit-error').style.display = 'none';
+  Modal.open('edit-modal');
+}
+
+async function saveTicket() {
+  const id       = document.getElementById('edit-ticket-id').value;
+  const saveBtn  = document.getElementById('save-btn');
+  const errEl    = document.getElementById('edit-error');
+  const priceVal = document.getElementById('edit-price').value;
+
+  const body = {
+    status:     document.getElementById('edit-status').value,
+    charged_as: document.getElementById('edit-charged-as').value,
+  };
+  if (priceVal !== '') body.price = parseFloat(priceVal);
+
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving…';
+  errEl.style.display = 'none';
+
+  try {
+    await Api.put(`/tickets/${id}`, body);
+    Toast.success('Ticket updated successfully.');
+    Modal.close('edit-modal');
+    loadTickets(currentPage);
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.style.display = 'block';
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save Changes';
+  }
+}
+
+function deleteTicket(id, label) {
+  confirmAction(
+    'Delete Ticket',
+    `Delete ticket for "${label}"? This cannot be undone. PAID tickets cannot be deleted.`,
+    async () => {
+      try {
+        await Api.delete(`/tickets/${id}`);
+        Toast.success('Ticket deleted.');
+        loadTickets(currentPage);
+      } catch (err) {
+        Toast.error(err.message);
+      }
+    }
+  );
+}
+
+document.addEventListener('DOMContentLoaded', () => loadTickets(1));
+</script>
+</body>
+</html>

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AutoPass — Detection Events</title>
+  <link rel="stylesheet" href="../css/dashboard.css"/>
+</head>
+<body>
+<div id="sidebar-container"></div>
+<div class="main">
+  <header class="topbar">
+    <span class="topbar-title">Detection Events</span>
+  </header>
+  <div class="page-content">
+    <div class="page-header">
+      <div class="page-header-left">
+        <h1>Detection Events</h1>
+        <p>Full ANPR pipeline audit trail from gate cameras.</p>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-card-header">
+        <span class="table-card-title" id="events-count">Events</span>
+        <div class="table-filters">
+          <input class="filter-input" type="text" id="plate-input" placeholder="Plate number…"/>
+          <select class="filter-select" id="stage-filter">
+            <option value="">All stages</option>
+            <option value="SUCCESS">SUCCESS</option>
+            <option value="NO_PLATE">NO_PLATE</option>
+            <option value="TEMPLATE_FAIL">TEMPLATE_FAIL</option>
+            <option value="OCR_FAIL">OCR_FAIL</option>
+          </select>
+          <select class="filter-select" id="decision-filter">
+            <option value="">All decisions</option>
+            <option value="OPEN">OPEN</option>
+            <option value="DENY">DENY</option>
+          </select>
+          <select class="filter-select" id="dup-filter">
+            <option value="">All</option>
+            <option value="false">Original</option>
+            <option value="true">Duplicates</option>
+          </select>
+          <input class="filter-input" type="date" id="from-filter" style="width:130px"/>
+          <input class="filter-input" type="date" id="to-filter" style="width:130px"/>
+          <button class="btn btn-secondary btn-sm" onclick="loadEvents(1)">Apply</button>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Gate</th>
+              <th>Zone</th>
+              <th>Plate</th>
+              <th>Stage</th>
+              <th>Confidence</th>
+              <th>Decision</th>
+              <th>Duplicate</th>
+              <th>Time</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="events-body">
+            <tr class="loading-row"><td colspan="9"><span class="spinner"></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination" id="events-pagination"></div>
+    </div>
+  </div>
+</div>
+
+<!-- View Event Modal -->
+<div class="modal-overlay" id="view-modal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <span class="modal-title">Detection Event Details</span>
+      <button class="modal-close" onclick="Modal.close('view-modal')"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div class="detail-grid" id="event-detail-grid"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger btn-sm" id="delete-event-btn">Delete Event</button>
+      <button class="btn btn-secondary" onclick="Modal.close('view-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/sidebar.js"></script>
+<script src="../js/dashboard.js"></script>
+<script>
+let currentPage = 1;
+let viewedEventId = null;
+
+async function loadEvents(page = 1) {
+  currentPage = page;
+  const plate    = document.getElementById('plate-input').value.trim();
+  const stage    = document.getElementById('stage-filter').value;
+  const decision = document.getElementById('decision-filter').value;
+  const dup      = document.getElementById('dup-filter').value;
+  const from     = document.getElementById('from-filter').value;
+  const to       = document.getElementById('to-filter').value;
+
+  const params = { page, limit: 20 };
+  if (plate)    params.plate_number     = plate;
+  if (stage)    params.detection_stage  = stage;
+  if (decision) params.decision         = decision;
+  if (dup)      params.is_duplicate     = dup;
+  if (from)     params.from             = from;
+  if (to)       params.to               = to + 'T23:59:59';
+
+  const tbody = document.getElementById('events-body');
+  tbody.innerHTML = '<tr class="loading-row"><td colspan="9"><span class="spinner"></span></td></tr>';
+
+  try {
+    const data = await Api.get('/detection-events' + Api.buildQuery(params));
+    document.getElementById('events-count').textContent = `Events (${data.meta?.total ?? 0})`;
+
+    if (!data.data?.length) {
+      tbody.innerHTML = '<tr><td colspan="9" class="table-empty">No events found</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = data.data.map(e => `
+      <tr>
+        <td style="font-size:12px">${Fmt.truncate(e.gate_name, 22)} <span style="color:var(--text-muted)">${e.gate_direction || ''}</span></td>
+        <td style="font-size:12px">${e.zone_name || '—'}</td>
+        <td><span class="mono">${e.plate_number || '—'}</span></td>
+        <td>${statusBadge(e.detection_stage)}</td>
+        <td style="font-family:var(--mono);font-size:12px">
+          ${e.ocr_confidence ? (e.ocr_confidence * 100).toFixed(0) + '%' : '—'}
+        </td>
+        <td>${statusBadge(e.decision)}</td>
+        <td>${e.is_duplicate ? statusBadge('TRUE') : statusBadge('FALSE')}</td>
+        <td style="color:var(--text-muted)">${Fmt.datetime(e.created_at)}</td>
+        <td>
+          <button class="btn btn-ghost btn-sm" onclick='viewEvent(${JSON.stringify(e).replace(/'/g,"&#39;")})'>View</button>
+        </td>
+      </tr>`).join('');
+
+    renderPagination('events-pagination', data.meta, loadEvents);
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="9" class="table-empty">${err.message}</td></tr>`;
+    Toast.error(err.message);
+  }
+}
+
+function viewEvent(e) {
+  viewedEventId = e.event_id;
+  document.getElementById('event-detail-grid').innerHTML = `
+    <div class="detail-item"><span class="detail-label">Event ID</span><span class="detail-value mono" style="font-size:11px">${e.event_id}</span></div>
+    <div class="detail-item"><span class="detail-label">Created</span><span class="detail-value">${Fmt.datetime(e.created_at)}</span></div>
+    <div class="detail-item"><span class="detail-label">Gate</span><span class="detail-value">${e.gate_name || '—'}</span></div>
+    <div class="detail-item"><span class="detail-label">Direction</span><span class="detail-value">${e.gate_direction || '—'}</span></div>
+    <div class="detail-item"><span class="detail-label">Zone</span><span class="detail-value">${e.zone_name || '—'}</span></div>
+    <div class="detail-item"><span class="detail-label">Vehicle</span><span class="detail-value mono">${e.plate_number || '—'}</span></div>
+    <div class="detail-item"><span class="detail-label">Detection Stage</span><span class="detail-value">${statusBadge(e.detection_stage)}</span></div>
+    <div class="detail-item"><span class="detail-label">Decision</span><span class="detail-value">${statusBadge(e.decision)}</span></div>
+    <div class="detail-item"><span class="detail-label">OCR Text</span><span class="detail-value mono">${e.ocr_text || '—'}</span></div>
+    <div class="detail-item"><span class="detail-label">OCR Confidence</span><span class="detail-value">${e.ocr_confidence !== null ? (e.ocr_confidence*100).toFixed(1)+'%' : '—'}</span></div>
+    <div class="detail-item"><span class="detail-label">Template Confidence</span><span class="detail-value">${e.template_confidence !== null ? (e.template_confidence*100).toFixed(1)+'%' : '—'}</span></div>
+    <div class="detail-item"><span class="detail-label">Duplicate</span><span class="detail-value">${statusBadge(String(e.is_duplicate).toUpperCase())}</span></div>
+    <div class="detail-item" style="grid-column:1/-1"><span class="detail-label">Failure Reason</span><span class="detail-value">${e.failure_reason || '—'}</span></div>
+    <div class="detail-item" style="grid-column:1/-1"><span class="detail-label">Image (MongoDB ID)</span><span class="detail-value mono" style="font-size:11px">${e.image_url || '—'}</span></div>`;
+
+  const deleteBtn = document.getElementById('delete-event-btn');
+  const newBtn = deleteBtn.cloneNode(true);
+  deleteBtn.parentNode.replaceChild(newBtn, deleteBtn);
+  newBtn.addEventListener('click', () => deleteEvent(e.event_id));
+
+  Modal.open('view-modal');
+}
+
+function deleteEvent(id) {
+  confirmAction('Delete Detection Event', 'This permanently removes the event from the audit trail. Cannot be undone. Will fail if linked tickets exist.', async () => {
+    try {
+      await Api.delete(`/detection-events/${id}`);
+      Toast.success('Event deleted.');
+      Modal.close('view-modal');
+      loadEvents(currentPage);
+    } catch (err) { Toast.error(err.message); }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => loadEvents());
+</script>
+</body>
+</html>

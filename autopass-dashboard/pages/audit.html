@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AutoPass — Audit Logs</title>
+  <link rel="stylesheet" href="../css/dashboard.css"/>
+</head>
+<body>
+<div id="sidebar-container"></div>
+<div class="main">
+  <header class="topbar">
+    <span class="topbar-title">Audit Logs</span>
+  </header>
+  <div class="page-content">
+    <div class="page-header">
+      <div class="page-header-left">
+        <h1>Audit Logs</h1>
+        <p>Immutable record of all admin actions in the system.</p>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-card-header">
+        <span class="table-card-title" id="audit-count">Audit Logs</span>
+        <div class="table-filters">
+          <input class="filter-input" type="text" id="action-input" placeholder="Action type…"/>
+          <input class="filter-input" type="text" id="entity-input" placeholder="Entity type…"/>
+          <input class="filter-input" type="date" id="from-filter" style="width:130px"/>
+          <input class="filter-input" type="date" id="to-filter" style="width:130px"/>
+          <button class="btn btn-secondary btn-sm" onclick="loadAudit(1)">Apply</button>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Action</th>
+              <th>Entity</th>
+              <th>Entity ID</th>
+              <th>Admin</th>
+              <th>IP Address</th>
+              <th>Timestamp</th>
+              <th>Changes</th>
+            </tr>
+          </thead>
+          <tbody id="audit-body">
+            <tr class="loading-row"><td colspan="7"><span class="spinner"></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination" id="audit-pagination"></div>
+    </div>
+  </div>
+</div>
+
+<!-- View Changes Modal -->
+<div class="modal-overlay" id="changes-modal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <span class="modal-title">Change Details</span>
+      <button class="modal-close" onclick="Modal.close('changes-modal')"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-muted);margin-bottom:8px">Before</div>
+          <pre id="old-value" style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:12px;font-size:11.5px;font-family:var(--mono);overflow:auto;max-height:300px;white-space:pre-wrap;color:var(--text-secondary)"></pre>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-muted);margin-bottom:8px">After</div>
+          <pre id="new-value" style="background:var(--green-soft);border:1px solid #bbf7d0;border-radius:var(--radius);padding:12px;font-size:11.5px;font-family:var(--mono);overflow:auto;max-height:300px;white-space:pre-wrap;color:var(--green)"></pre>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="Modal.close('changes-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/sidebar.js"></script>
+<script src="../js/dashboard.js"></script>
+<script>
+let currentPage = 1;
+
+const actionBadge = (action) => {
+  const cls = action?.startsWith('CREATE') ? 'badge-green' : action?.startsWith('DELETE') ? 'badge-red' : action?.startsWith('UPDATE') ? 'badge-blue' : 'badge-grey';
+  return `<span class="badge ${cls}">${action || '—'}</span>`;
+};
+
+async function loadAudit(page = 1) {
+  currentPage = page;
+  const action = document.getElementById('action-input').value.trim();
+  const entity = document.getElementById('entity-input').value.trim();
+  const from   = document.getElementById('from-filter').value;
+  const to     = document.getElementById('to-filter').value;
+
+  const params = { page, limit: 20 };
+  if (action) params.action_type  = action;
+  if (entity) params.entity_type  = entity;
+  if (from)   params.from = new Date(from).toISOString();
+  if (to) {
+    const toDate = new Date(to);
+    toDate.setHours(23, 59, 59, 999);
+    params.to = toDate.toISOString();
+  }
+
+  const tbody = document.getElementById('audit-body');
+  tbody.innerHTML = '<tr class="loading-row"><td colspan="7"><span class="spinner"></span></td></tr>';
+
+  try {
+    const data = await Api.get('/audit-logs' + Api.buildQuery(params));
+    document.getElementById('audit-count').textContent = `Audit Logs (${data.meta?.total ?? 0})`;
+
+    if (!data.data?.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="table-empty">No audit logs found</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = data.data.map(log => `
+      <tr>
+        <td>${actionBadge(log.action_type)}</td>
+        <td><span class="badge badge-grey">${log.entity_type || '—'}</span></td>
+        <td><span class="mono" style="font-size:11px">${log.entity_id ? Fmt.uuid(log.entity_id) : '—'}</span></td>
+        <td style="font-size:12px">${log.admin_id ? Fmt.uuid(log.admin_id) : '—'}</td>
+        <td style="font-family:var(--mono);font-size:12px;color:var(--text-muted)">${log.ip_address || '—'}</td>
+        <td style="color:var(--text-muted)">${Fmt.datetime(log.created_at)}</td>
+        <td>
+          ${(log.old_value || log.new_value)
+            ? `<button class="btn btn-ghost btn-sm" onclick='showChanges(${JSON.stringify(log).replace(/'/g,"&#39;")})'>View</button>`
+            : '<span style="color:var(--text-muted);font-size:12px">—</span>'
+          }
+        </td>
+      </tr>`).join('');
+
+    renderPagination('audit-pagination', data.meta, loadAudit);
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7" class="table-empty">${err.message}</td></tr>`;
+    Toast.error(err.message);
+  }
+}
+
+function showChanges(log) {
+  document.getElementById('old-value').textContent = log.old_value
+    ? JSON.stringify(log.old_value, null, 2)
+    : 'No data (record created)';
+  document.getElementById('new-value').textContent = log.new_value
+    ? JSON.stringify(log.new_value, null, 2)
+    : 'No data (record deleted)';
+  Modal.open('changes-modal');
+}
+
+document.addEventListener('DOMContentLoaded', () => loadAudit());
+</script>
+</body>
+</html>

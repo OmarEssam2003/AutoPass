@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AutoPass — Gates & Zones</title>
+  <link rel="stylesheet" href="../css/dashboard.css"/>
+</head>
+<body>
+<div id="sidebar-container"></div>
+<div class="main">
+  <header class="topbar">
+    <span class="topbar-title">Gates & Zones</span>
+  </header>
+  <div class="page-content">
+    <div class="page-header">
+      <div class="page-header-left">
+        <h1>Gates & Zones</h1>
+        <p>Manage physical gates and their zone groupings.</p>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary" onclick="openCreateZone()">+ Zone</button>
+        <button class="btn btn-primary" onclick="openCreateGate()">+ Gate</button>
+      </div>
+    </div>
+
+    <!-- Zones Table -->
+    <div class="table-card" style="margin-bottom:16px">
+      <div class="table-card-header">
+        <span class="table-card-title" id="zones-count">Zones</span>
+        <button class="btn btn-secondary btn-sm" onclick="loadZones()">Refresh</button>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Zone Name</th>
+              <th>Dedup Window</th>
+              <th>Zone ID</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="zones-body">
+            <tr class="loading-row"><td colspan="4"><span class="spinner"></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Gates Table -->
+    <div class="table-card">
+      <div class="table-card-header">
+        <span class="table-card-title" id="gates-count">Gates</span>
+        <div class="table-filters">
+          <select class="filter-select" id="direction-filter">
+            <option value="">All directions</option>
+            <option value="IN">IN</option>
+            <option value="OUT">OUT</option>
+          </select>
+          <select class="filter-select" id="active-filter">
+            <option value="">All</option>
+            <option value="true">Active</option>
+            <option value="false">Inactive</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="loadGates(1)">Apply</button>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Location</th>
+              <th>Direction</th>
+              <th>Zone</th>
+              <th>Device Serial</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="gates-body">
+            <tr class="loading-row"><td colspan="6"><span class="spinner"></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination" id="gates-pagination"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Create Zone Modal -->
+<div class="modal-overlay" id="create-zone-modal">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header">
+      <span class="modal-title">New Zone</span>
+      <button class="modal-close" onclick="Modal.close('create-zone-modal')"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">Zone Name *</label>
+        <input class="form-input" type="text" id="cz-name" placeholder="e.g. North Entrance Zone"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Deduplication Window (minutes)</label>
+        <input class="form-input" type="number" id="cz-dedup" value="15" min="1"/>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="Modal.close('create-zone-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="createZone()">Create Zone</button>
+    </div>
+  </div>
+</div>
+
+<!-- Create Gate Modal -->
+<div class="modal-overlay" id="create-gate-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">New Gate</span>
+      <button class="modal-close" onclick="Modal.close('create-gate-modal')"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label class="form-label">Location Name *</label>
+          <input class="form-input" type="text" id="cg-location" placeholder="e.g. North Entrance Gate A"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Direction *</label>
+          <select class="form-select" id="cg-direction">
+            <option value="IN">IN</option>
+            <option value="OUT">OUT</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Zone</label>
+          <select class="form-select" id="cg-zone">
+            <option value="">No zone</option>
+          </select>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Device Serial</label>
+          <input class="form-input" type="text" id="cg-serial" placeholder="Optional — e.g. RPI-001-2026"/>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="Modal.close('create-gate-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="createGate()">Create Gate</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Gate Modal -->
+<div class="modal-overlay" id="edit-gate-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Update Gate</span>
+      <button class="modal-close" onclick="Modal.close('edit-gate-modal')"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="eg-id"/>
+      <div class="form-grid">
+        <div class="form-group full">
+          <label class="form-label">Location Name</label>
+          <input class="form-input" type="text" id="eg-location"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Direction</label>
+          <select class="form-select" id="eg-direction">
+            <option value="IN">IN</option>
+            <option value="OUT">OUT</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Active</label>
+          <select class="form-select" id="eg-active">
+            <option value="true">Active</option>
+            <option value="false">Inactive</option>
+          </select>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Device Serial</label>
+          <input class="form-input" type="text" id="eg-serial"/>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="Modal.close('edit-gate-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveGate()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/sidebar.js"></script>
+<script src="../js/dashboard.js"></script>
+<script>
+let currentPage = 1;
+let allZones = [];
+
+async function loadZones() {
+  const tbody = document.getElementById('zones-body');
+  try {
+    const data = await Api.get('/zones?limit=100');
+    allZones = data.data || [];
+    document.getElementById('zones-count').textContent = `Zones (${allZones.length})`;
+
+    // Populate zone selects
+    ['cg-zone'].forEach(id => {
+      const sel = document.getElementById(id);
+      if (sel) sel.innerHTML = '<option value="">No zone</option>' + allZones.map(z => `<option value="${z.zone_id}">${z.zone_name}</option>`).join('');
+    });
+
+    if (!allZones.length) { tbody.innerHTML = '<tr><td colspan="4" class="table-empty">No zones</td></tr>'; return; }
+    tbody.innerHTML = allZones.map(z => `
+      <tr>
+        <td><strong>${z.zone_name}</strong></td>
+        <td>${z.deduplication_window_minutes} min</td>
+        <td><span class="mono" style="font-size:11px">${Fmt.uuid(z.zone_id)}</span></td>
+        <td>
+          <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteZone('${z.zone_id}','${z.zone_name}')">Del</button>
+        </td>
+      </tr>`).join('');
+  } catch (err) { tbody.innerHTML = `<tr><td colspan="4" class="table-empty">${err.message}</td></tr>`; }
+}
+
+async function loadGates(page = 1) {
+  currentPage = page;
+  const direction = document.getElementById('direction-filter').value;
+  const isActive  = document.getElementById('active-filter').value;
+
+  const params = { page, limit: 20 };
+  if (direction) params.direction = direction;
+  if (isActive)  params.is_active = isActive;
+
+  const tbody = document.getElementById('gates-body');
+  tbody.innerHTML = '<tr class="loading-row"><td colspan="6"><span class="spinner"></span></td></tr>';
+
+  try {
+    const data = await Api.get('/gates' + Api.buildQuery(params));
+    document.getElementById('gates-count').textContent = `Gates (${data.meta?.total ?? 0})`;
+
+    if (!data.data?.length) { tbody.innerHTML = '<tr><td colspan="6" class="table-empty">No gates found</td></tr>'; return; }
+
+    tbody.innerHTML = data.data.map(g => `
+      <tr>
+        <td><strong>${g.location_name}</strong></td>
+        <td>${g.direction === 'IN' ? statusBadge('OPEN') : '<span class="badge badge-amber"><span class="badge-dot"></span>OUT</span>'}</td>
+        <td>${g.zone_name || '—'}</td>
+        <td><span class="mono" style="font-size:12px">${g.device_serial || '—'}</span></td>
+        <td>${g.is_active ? statusBadge('ACTIVE') : statusBadge('INACTIVE')}</td>
+        <td>
+          <div style="display:flex;gap:4px">
+            <button class="btn btn-ghost btn-sm" onclick='openEditGate(${JSON.stringify(g).replace(/'/g,"&#39;")})'>Edit</button>
+            <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteGate('${g.gate_id}','${g.location_name}')">Del</button>
+          </div>
+        </td>
+      </tr>`).join('');
+
+    renderPagination('gates-pagination', data.meta, loadGates);
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="6" class="table-empty">${err.message}</td></tr>`;
+    Toast.error(err.message);
+  }
+}
+
+function openCreateZone() { Modal.open('create-zone-modal'); }
+function openCreateGate()  { Modal.open('create-gate-modal'); }
+
+async function createZone() {
+  const body = {
+    zone_name:                      document.getElementById('cz-name').value.trim(),
+    deduplication_window_minutes:   parseInt(document.getElementById('cz-dedup').value) || 15,
+  };
+  if (!body.zone_name) { Toast.warning('Zone name is required.'); return; }
+  try {
+    await Api.post('/zones', body);
+    Toast.success('Zone created.');
+    Modal.close('create-zone-modal');
+    loadZones();
+  } catch (err) { Toast.error(err.message); }
+}
+
+async function createGate() {
+  const body = {
+    location_name: document.getElementById('cg-location').value.trim(),
+    direction:     document.getElementById('cg-direction').value,
+    zone_id:       document.getElementById('cg-zone').value || undefined,
+    device_serial: document.getElementById('cg-serial').value.trim() || undefined,
+  };
+  if (!body.location_name) { Toast.warning('Location name is required.'); return; }
+  try {
+    await Api.post('/gates', body);
+    Toast.success('Gate created.');
+    Modal.close('create-gate-modal');
+    loadGates();
+  } catch (err) { Toast.error(err.message); }
+}
+
+function openEditGate(g) {
+  document.getElementById('eg-id').value        = g.gate_id;
+  document.getElementById('eg-location').value  = g.location_name;
+  document.getElementById('eg-direction').value = g.direction;
+  document.getElementById('eg-active').value    = String(g.is_active);
+  document.getElementById('eg-serial').value    = g.device_serial || '';
+  Modal.open('edit-gate-modal');
+}
+
+async function saveGate() {
+  const id   = document.getElementById('eg-id').value;
+  const body = {
+    location_name: document.getElementById('eg-location').value.trim(),
+    direction:     document.getElementById('eg-direction').value,
+    is_active:     document.getElementById('eg-active').value === 'true',
+    device_serial: document.getElementById('eg-serial').value.trim() || null,
+  };
+  try {
+    await Api.put(`/gates/${id}`, body);
+    Toast.success('Gate updated.');
+    Modal.close('edit-gate-modal');
+    loadGates(currentPage);
+  } catch (err) { Toast.error(err.message); }
+}
+
+function deleteZone(id, name) {
+  confirmAction('Delete Zone', `Delete zone "${name}"? All gates in this zone will be unassigned.`, async () => {
+    try {
+      await Api.delete(`/zones/${id}`);
+      Toast.success('Zone deleted.');
+      loadZones();
+    } catch (err) { Toast.error(err.message); }
+  });
+}
+
+function deleteGate(id, name) {
+  confirmAction('Delete Gate', `Delete gate "${name}"?`, async () => {
+    try {
+      await Api.delete(`/gates/${id}`);
+      Toast.success('Gate deleted.');
+      loadGates(currentPage);
+    } catch (err) { Toast.error(err.message); }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => { loadZones(); loadGates(); });
+</script>
+</body>
+</html>

@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AutoPass — Payments</title>
+  <link rel="stylesheet" href="../css/dashboard.css"/>
+</head>
+<body>
+<div id="sidebar-container"></div>
+<div class="main">
+  <header class="topbar">
+    <span class="topbar-title">Payments</span>
+  </header>
+  <div class="page-content">
+    <div class="page-header">
+      <div class="page-header-left">
+        <h1>Payments</h1>
+        <p>View payment records and issue refunds.</p>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-card-header">
+        <span class="table-card-title" id="payments-count">Payments</span>
+        <div class="table-filters">
+          <select class="filter-select" id="status-filter">
+            <option value="">All statuses</option>
+            <option value="COMPLETED">Completed</option>
+            <option value="FAILED">Failed</option>
+            <option value="REFUNDED">Refunded</option>
+          </select>
+          <input class="filter-input" type="date" id="from-filter" style="width:140px"/>
+          <input class="filter-input" type="date" id="to-filter" style="width:140px"/>
+          <button class="btn btn-secondary btn-sm" onclick="loadPayments(1)">Apply</button>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Payment ID</th>
+              <th>User</th>
+              <th>Amount</th>
+              <th>Method</th>
+              <th>Status</th>
+              <th>Tickets</th>
+              <th>Paid At</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="payments-body">
+            <tr class="loading-row"><td colspan="8"><span class="spinner"></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination" id="payments-pagination"></div>
+    </div>
+  </div>
+</div>
+
+<!-- View Payment Modal -->
+<div class="modal-overlay" id="view-modal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <span class="modal-title">Payment Details</span>
+      <button class="modal-close" onclick="Modal.close('view-modal')"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div class="detail-grid" id="payment-detail-grid" style="margin-bottom:20px"></div>
+      <div style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:10px">Tickets Covered</div>
+      <table style="font-size:12.5px">
+        <thead><tr><th>Ticket ID</th><th>Plate</th><th>Price</th><th>Status</th><th>Gate</th><th>Zone</th></tr></thead>
+        <tbody id="payment-tickets-body"></tbody>
+      </table>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger btn-sm" id="refund-btn" style="display:none">Issue Refund</button>
+      <button class="btn btn-secondary" onclick="Modal.close('view-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/sidebar.js"></script>
+<script src="../js/dashboard.js"></script>
+<script>
+let currentPage = 1;
+let currentPaymentId = null;
+
+async function loadPayments(page = 1) {
+  currentPage = page;
+  const status = document.getElementById('status-filter').value;
+  const from   = document.getElementById('from-filter').value;
+  const to     = document.getElementById('to-filter').value;
+
+  const params = { page, limit: 20 };
+  if (status) params.status = status;
+  if (from)   params.from   = from;
+  if (to)     params.to     = to + 'T23:59:59';
+
+  const tbody = document.getElementById('payments-body');
+  tbody.innerHTML = '<tr class="loading-row"><td colspan="8"><span class="spinner"></span></td></tr>';
+
+  try {
+    const data = await Api.get('/payments' + Api.buildQuery(params));
+    document.getElementById('payments-count').textContent = `Payments (${data.meta?.total ?? 0})`;
+
+    if (!data.data?.length) {
+      tbody.innerHTML = '<tr><td colspan="8" class="table-empty">No payments found</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = data.data.map(p => `
+      <tr>
+        <td><span class="mono" style="font-size:11px">${Fmt.uuid(p.payment_id)}</span></td>
+        <td>
+          ${p.first_name ? `<div style="font-weight:500">${p.first_name} ${p.last_name}</div><div style="font-size:11px;color:var(--text-muted)">${p.email}</div>` : '—'}
+        </td>
+        <td><strong>${Fmt.currency(p.amount)}</strong></td>
+        <td style="font-size:12px;color:var(--text-secondary)">${p.payment_method}</td>
+        <td>${statusBadge(p.status)}</td>
+        <td style="color:var(--text-secondary)">${p.ticket_ids?.length ?? 0} ticket(s)</td>
+        <td style="color:var(--text-muted)">${Fmt.datetime(p.paid_at)}</td>
+        <td>
+          <button class="btn btn-ghost btn-sm" onclick="viewPayment('${p.payment_id}', '${p.status}')">View</button>
+        </td>
+      </tr>`).join('');
+
+    renderPagination('payments-pagination', data.meta, loadPayments);
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="8" class="table-empty">${err.message}</td></tr>`;
+    Toast.error(err.message);
+  }
+}
+
+async function viewPayment(id, status) {
+  currentPaymentId = id;
+  Modal.open('view-modal');
+  document.getElementById('payment-detail-grid').innerHTML = '<span class="spinner"></span>';
+  document.getElementById('payment-tickets-body').innerHTML = '';
+
+  try {
+    const data = await Api.get(`/payments/${id}`);
+    const p = data.data;
+
+    document.getElementById('payment-detail-grid').innerHTML = `
+      <div class="detail-item"><span class="detail-label">Payment ID</span><span class="detail-value mono" style="font-size:11px">${p.payment_id}</span></div>
+      <div class="detail-item"><span class="detail-label">Status</span><span class="detail-value">${statusBadge(p.status)}</span></div>
+      <div class="detail-item"><span class="detail-label">Amount</span><span class="detail-value"><strong>${Fmt.currency(p.amount)}</strong></span></div>
+      <div class="detail-item"><span class="detail-label">Method</span><span class="detail-value">${p.payment_method}</span></div>
+      <div class="detail-item"><span class="detail-label">User</span><span class="detail-value">${p.first_name ? `${p.first_name} ${p.last_name}` : '—'}</span></div>
+      <div class="detail-item"><span class="detail-label">Email</span><span class="detail-value">${p.email || '—'}</span></div>
+      <div class="detail-item"><span class="detail-label">Paid At</span><span class="detail-value">${Fmt.datetime(p.paid_at)}</span></div>`;
+
+    document.getElementById('payment-tickets-body').innerHTML = (p.tickets || []).map(t => `
+      <tr>
+        <td><span class="mono" style="font-size:11px">${Fmt.uuid(t.ticket_id)}</span></td>
+        <td><span class="mono">${t.plate_number}</span></td>
+        <td>${Fmt.currency(t.price)}</td>
+        <td>${statusBadge(t.status)}</td>
+        <td style="font-size:12px">${t.gate_name || '—'}</td>
+        <td style="font-size:12px">${t.zone_name || '—'}</td>
+      </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:12px">No tickets</td></tr>';
+
+    const refundBtn = document.getElementById('refund-btn');
+    if (p.status === 'COMPLETED') {
+      refundBtn.style.display = 'inline-flex';
+      const newBtn = refundBtn.cloneNode(true);
+      refundBtn.parentNode.replaceChild(newBtn, refundBtn);
+      newBtn.style.display = 'inline-flex';
+      newBtn.addEventListener('click', () => refundPayment(id));
+    } else {
+      refundBtn.style.display = 'none';
+    }
+  } catch (err) {
+    Toast.error(err.message);
+    Modal.close('view-modal');
+  }
+}
+
+function refundPayment(id) {
+  confirmAction('Issue Refund', 'This will mark the payment as refunded and set all linked tickets back to UNPAID. This cannot be undone.', async () => {
+    try {
+      await Api.post(`/payments/${id}/refund`);
+      Toast.success('Refund issued successfully.');
+      Modal.close('view-modal');
+      loadPayments(currentPage);
+    } catch (err) { Toast.error(err.message); }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => loadPayments());
+</script>
+</body>
+</html>

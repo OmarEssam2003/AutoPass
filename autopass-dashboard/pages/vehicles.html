@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AutoPass — Vehicles</title>
+  <link rel="stylesheet" href="../css/dashboard.css"/>
+</head>
+<body>
+<div id="sidebar-container"></div>
+<div class="main">
+  <header class="topbar">
+    <span class="topbar-title">Vehicles</span>
+  </header>
+  <div class="page-content">
+    <div class="page-header">
+      <div class="page-header-left">
+        <h1>Vehicles</h1>
+        <p>All registered vehicles in the system.</p>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-card-header">
+        <span class="table-card-title" id="vehicles-count">Vehicles</span>
+        <div class="table-filters">
+          <input class="filter-input" type="text" id="plate-input" placeholder="Plate number…"/>
+          <input class="filter-input" type="text" id="type-input" placeholder="Vehicle type…"/>
+          <button class="btn btn-secondary btn-sm" onclick="loadVehicles(1)">Apply</button>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Plate</th>
+              <th>Type</th>
+              <th>Make / Model</th>
+              <th>Color</th>
+              <th>Owner Phone</th>
+              <th>Registered</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="vehicles-body">
+            <tr class="loading-row"><td colspan="7"><span class="spinner"></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination" id="vehicles-pagination"></div>
+    </div>
+  </div>
+</div>
+
+<!-- View Modal -->
+<div class="modal-overlay" id="view-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Vehicle Details</span>
+      <button class="modal-close" onclick="Modal.close('view-modal')"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div class="detail-grid" id="vehicle-detail-grid"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="Modal.close('view-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/sidebar.js"></script>
+<script src="../js/dashboard.js"></script>
+<script>
+let currentPage = 1;
+
+async function loadVehicles(page = 1) {
+  currentPage = page;
+  const plate = document.getElementById('plate-input').value.trim();
+  const type  = document.getElementById('type-input').value.trim();
+
+  const params = { page, limit: 20 };
+  if (plate) params.plate_number  = plate;
+  if (type)  params.vehicle_type  = type;
+
+  const tbody = document.getElementById('vehicles-body');
+  tbody.innerHTML = '<tr class="loading-row"><td colspan="7"><span class="spinner"></span></td></tr>';
+
+  try {
+    const data = await Api.get('/vehicles' + Api.buildQuery(params));
+    document.getElementById('vehicles-count').textContent = `Vehicles (${data.meta?.total ?? 0})`;
+
+    if (!data.data?.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="table-empty">No vehicles found</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = data.data.map(v => `
+      <tr>
+        <td><span class="mono" style="font-weight:600;font-size:14px">${v.plate_number}</span></td>
+        <td>${v.vehicle_type ? `<span class="badge badge-blue">${v.vehicle_type}</span>` : '—'}</td>
+        <td style="color:var(--text-secondary)">${[v.make, v.model].filter(Boolean).join(' ') || '—'}</td>
+        <td>
+          ${v.color
+            ? `<div style="display:flex;align-items:center;gap:6px"><div style="width:10px;height:10px;border-radius:50%;background:${v.color.toLowerCase()};border:1px solid var(--border)"></div>${v.color}</div>`
+            : '—'}
+        </td>
+        <td style="color:var(--text-secondary)">${v.owner_phone_number}</td>
+        <td style="color:var(--text-muted)">${Fmt.date(v.created_at)}</td>
+        <td>
+          <button class="btn btn-ghost btn-sm" onclick='viewVehicle(${JSON.stringify(v).replace(/'/g,"&#39;")})'>View</button>
+        </td>
+      </tr>`).join('');
+
+    renderPagination('vehicles-pagination', data.meta, loadVehicles);
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7" class="table-empty">${err.message}</td></tr>`;
+    Toast.error(err.message);
+  }
+}
+
+function viewVehicle(v) {
+  document.getElementById('vehicle-detail-grid').innerHTML = `
+    <div class="detail-item"><span class="detail-label">Vehicle ID</span><span class="detail-value mono" style="font-size:11px">${v.vehicle_id}</span></div>
+    <div class="detail-item"><span class="detail-label">Plate Number</span><span class="detail-value mono" style="font-size:16px;font-weight:700">${v.plate_number}</span></div>
+    <div class="detail-item"><span class="detail-label">Type</span><span class="detail-value">${v.vehicle_type || '—'}</span></div>
+    <div class="detail-item"><span class="detail-label">Color</span><span class="detail-value">${v.color || '—'}</span></div>
+    <div class="detail-item"><span class="detail-label">Make</span><span class="detail-value">${v.make || '—'}</span></div>
+    <div class="detail-item"><span class="detail-label">Model</span><span class="detail-value">${v.model || '—'}</span></div>
+    <div class="detail-item"><span class="detail-label">Owner Phone</span><span class="detail-value">${v.owner_phone_number}</span></div>
+    <div class="detail-item"><span class="detail-label">Registered</span><span class="detail-value">${Fmt.datetime(v.created_at)}</span></div>`;
+  Modal.open('view-modal');
+}
+
+document.addEventListener('DOMContentLoaded', () => loadVehicles());
+</script>
+</body>
+</html>

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AutoPass — Users</title>
+  <link rel="stylesheet" href="../css/dashboard.css"/>
+</head>
+<body>
+<div id="sidebar-container"></div>
+<div class="main">
+  <header class="topbar">
+    <span class="topbar-title">Users</span>
+  </header>
+  <div class="page-content">
+    <div class="page-header">
+      <div class="page-header-left">
+        <h1>Users</h1>
+        <p>Manage registered user accounts.</p>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-card-header">
+        <span class="table-card-title" id="users-count">Users</span>
+        <div class="table-filters">
+          <input class="filter-input" type="text" id="search-input" placeholder="Search name, email, ID…"/>
+          <select class="filter-select" id="blocked-filter">
+            <option value="">All users</option>
+            <option value="false">Active</option>
+            <option value="true">Blocked</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="loadUsers()">
+            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.989a.75.75 0 00-.75.75v4.242a.75.75 0 001.5 0v-2.43l.31.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.53V2.929a.75.75 0 00-1.5 0v2.43l-.31-.31A7 7 0 003.239 8.188a.75.75 0 101.448.389A5.5 5.5 0 0113.89 6.11l.311.31h-2.432a.75.75 0 000 1.5h4.243a.75.75 0 00.53-.219z" clip-rule="evenodd"/></svg>
+            Refresh
+          </button>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>National ID</th>
+              <th>Phone</th>
+              <th>Status</th>
+              <th>Joined</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="users-body">
+            <tr class="loading-row"><td colspan="7"><span class="spinner"></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination" id="users-pagination"></div>
+    </div>
+  </div>
+</div>
+
+<!-- View User Modal -->
+<div class="modal-overlay" id="view-modal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <span class="modal-title">User Details</span>
+      <button class="modal-close" onclick="Modal.close('view-modal')"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div class="detail-grid" id="user-detail-grid"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger btn-sm" id="block-btn">Block User</button>
+      <button class="btn btn-secondary" onclick="Modal.close('view-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/sidebar.js"></script>
+<script src="../js/dashboard.js"></script>
+<script>
+let currentPage = 1;
+let currentUser = null;
+
+async function loadUsers(page = 1) {
+  currentPage = page;
+  const search    = document.getElementById('search-input').value.trim();
+  const isBlocked = document.getElementById('blocked-filter').value;
+
+  const params = { page, limit: 20 };
+  if (search) params.search = search;
+  if (isBlocked !== '') params.is_blocked = isBlocked;
+
+  const tbody = document.getElementById('users-body');
+  tbody.innerHTML = '<tr class="loading-row"><td colspan="7"><span class="spinner"></span></td></tr>';
+
+  try {
+    const data = await Api.get('/users' + Api.buildQuery(params));
+    document.getElementById('users-count').textContent = `Users (${data.meta?.total ?? 0})`;
+
+    if (!data.data?.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="table-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0"/></svg>No users found</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = data.data.map(u => `
+      <tr>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="admin-avatar" style="width:28px;height:28px;font-size:11px;background:var(--blue)">${Fmt.initials(u.first_name, u.last_name)}</div>
+            <div>
+              <div style="font-weight:500">${u.first_name} ${u.last_name}</div>
+              ${u.middle_name ? `<div style="font-size:11px;color:var(--text-muted)">${u.middle_name}</div>` : ''}
+            </div>
+          </div>
+        </td>
+        <td style="color:var(--text-secondary)">${u.email}</td>
+        <td><span class="mono">${u.national_id}</span></td>
+        <td style="color:var(--text-secondary)">${u.phone_number}</td>
+        <td>${u.is_blocked ? statusBadge('INACTIVE') : statusBadge('ACTIVE')}</td>
+        <td style="color:var(--text-muted)">${Fmt.date(u.created_at)}</td>
+        <td>
+          <div style="display:flex;gap:4px">
+            <button class="btn btn-ghost btn-sm" onclick="viewUser(${JSON.stringify(u).replace(/"/g, '&quot;')})">View</button>
+          </div>
+        </td>
+      </tr>`).join('');
+
+    renderPagination('users-pagination', data.meta, loadUsers);
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7" class="table-empty">${err.message}</td></tr>`;
+    Toast.error(err.message);
+  }
+}
+
+function viewUser(u) {
+  currentUser = u;
+  document.getElementById('user-detail-grid').innerHTML = `
+    <div class="detail-item"><span class="detail-label">User ID</span><span class="detail-value mono" style="font-size:11px">${u.user_id}</span></div>
+    <div class="detail-item"><span class="detail-label">Email</span><span class="detail-value">${u.email}</span></div>
+    <div class="detail-item"><span class="detail-label">First Name</span><span class="detail-value">${u.first_name}</span></div>
+    <div class="detail-item"><span class="detail-label">Last Name</span><span class="detail-value">${u.last_name}</span></div>
+    <div class="detail-item"><span class="detail-label">National ID</span><span class="detail-value mono">${u.national_id}</span></div>
+    <div class="detail-item"><span class="detail-label">Phone</span><span class="detail-value">${u.phone_number}</span></div>
+    <div class="detail-item"><span class="detail-label">Date of Birth</span><span class="detail-value">${Fmt.date(u.date_of_birth)}</span></div>
+    <div class="detail-item"><span class="detail-label">Status</span><span class="detail-value">${u.is_blocked ? statusBadge('INACTIVE') : statusBadge('ACTIVE')}</span></div>
+    <div class="detail-item" style="grid-column:1/-1"><span class="detail-label">Address</span><span class="detail-value">${u.address || '—'}</span></div>
+    <div class="detail-item"><span class="detail-label">Joined</span><span class="detail-value">${Fmt.datetime(u.created_at)}</span></div>
+    <div class="detail-item"><span class="detail-label">ID Image</span><span class="detail-value mono" style="font-size:11px">${u.national_id_image_link || '—'}</span></div>`;
+
+  const blockBtn = document.getElementById('block-btn');
+  blockBtn.textContent = u.is_blocked ? 'Unblock User' : 'Block User';
+  blockBtn.className = u.is_blocked ? 'btn btn-secondary btn-sm' : 'btn btn-danger btn-sm';
+
+  const newBtn = blockBtn.cloneNode(true);
+  blockBtn.parentNode.replaceChild(newBtn, blockBtn);
+  newBtn.addEventListener('click', () => toggleBlock(u));
+
+  Modal.open('view-modal');
+}
+
+async function toggleBlock(u) {
+  const action = u.is_blocked ? 'unblock' : 'block';
+  confirmAction(
+    `${u.is_blocked ? 'Unblock' : 'Block'} User`,
+    `Are you sure you want to ${action} ${u.first_name} ${u.last_name}?`,
+    async () => {
+      try {
+        await Api.put(`/users/${u.user_id}`, { is_blocked: !u.is_blocked });
+        Toast.success(`User ${action}ed successfully.`);
+        Modal.close('view-modal');
+        loadUsers(currentPage);
+      } catch (err) { Toast.error(err.message); }
+    }
+  );
+}
+
+let searchTimer;
+document.getElementById('search-input').addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => loadUsers(1), 400);
+});
+document.getElementById('blocked-filter').addEventListener('change', () => loadUsers(1));
+
+document.addEventListener('DOMContentLoaded', () => loadUsers());
+</script>
+</body>
+</html>

@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AutoPass — Alerts</title>
+  <link rel="stylesheet" href="../css/dashboard.css"/>
+  <style>
+    .severity-critical { background: var(--red); color: #fff; }
+    .severity-warning  { background: var(--amber); color: #fff; }
+    .severity-info     { background: var(--blue); color: #fff; }
+
+    .quick-filters {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-secondary);
+      transition: all 0.15s;
+    }
+    .chip:hover { background: var(--bg-hover); }
+    .chip.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+    .chip-count {
+      font-size: 11px;
+      padding: 1px 6px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.25);
+    }
+
+    .alert-row-critical { background: rgba(239, 68, 68, 0.06); }
+    .alert-row-warning  { background: rgba(245, 158, 11, 0.05); }
+    .alert-row-unread   { background: var(--amber-soft); }
+  </style>
+</head>
+<body>
+<div id="sidebar-container"></div>
+<div class="main">
+  <header class="topbar">
+    <span class="topbar-title">Alerts</span>
+  </header>
+  <div class="page-content">
+    <div class="page-header">
+      <div class="page-header-left">
+        <h1>Alerts</h1>
+        <p>System notifications, security events, and user-facing alerts.</p>
+      </div>
+    </div>
+
+    <!-- Quick filter chips -->
+    <div class="quick-filters">
+      <button class="chip active" data-filter="all" onclick="setQuickFilter(this)">
+        All
+      </button>
+      <button class="chip" data-filter="stolen" onclick="setQuickFilter(this)">
+        🚨 Stolen Detected
+      </button>
+      <button class="chip" data-filter="enforcement" onclick="setQuickFilter(this)">
+        ⚠️ Enforcement Hits
+      </button>
+      <button class="chip" data-filter="detection_failed" onclick="setQuickFilter(this)">
+        ❓ Unknown Plates
+      </button>
+      <button class="chip" data-filter="critical" onclick="setQuickFilter(this)">
+        🔴 Critical
+      </button>
+      <button class="chip" data-filter="unread" onclick="setQuickFilter(this)">
+        Unread
+      </button>
+    </div>
+
+    <div class="table-card">
+      <div class="table-card-header">
+        <span class="table-card-title" id="alerts-count">Alerts</span>
+        <div class="table-filters">
+          <select class="filter-select" id="read-filter">
+            <option value="">Read status</option>
+            <option value="false">Unread</option>
+            <option value="true">Read</option>
+          </select>
+          <select class="filter-select" id="severity-filter">
+            <option value="">Severity</option>
+            <option value="CRITICAL">Critical</option>
+            <option value="WARNING">Warning</option>
+            <option value="INFO">Info</option>
+          </select>
+          <input class="filter-input" type="text" id="type-input" placeholder="Alert type…"/>
+          <button class="btn btn-secondary btn-sm" onclick="loadAlerts(1)">Apply</button>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Severity</th>
+              <th>Type</th>
+              <th>Title / Message</th>
+              <th>Vehicle</th>
+              <th>Gate</th>
+              <th>Target</th>
+              <th>Read</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody id="alerts-body">
+            <tr class="loading-row"><td colspan="8"><span class="spinner"></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination" id="alerts-pagination"></div>
+    </div>
+  </div>
+</div>
+
+<script src="../js/sidebar.js"></script>
+<script src="../js/dashboard.js"></script>
+<script>
+let currentPage = 1;
+let activeQuickFilter = 'all';
+
+function setQuickFilter(btn) {
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  activeQuickFilter = btn.dataset.filter;
+  loadAlerts(1);
+}
+
+function severityBadge(sev) {
+  const s = (sev || 'INFO').toUpperCase();
+  return `<span class="badge severity-${s.toLowerCase()}">${s}</span>`;
+}
+
+function typeBadge(type) {
+  const t = (type || '').toUpperCase();
+  // Color-code system event types
+  if (t === 'STOLEN_DETECTED')        return `<span class="badge severity-critical">🚨 STOLEN</span>`;
+  if (t === 'ENFORCEMENT_HIT')        return `<span class="badge severity-warning">⚠️ ENF HIT</span>`;
+  if (t === 'AUTO_BLOCK_TRIGGERED')   return `<span class="badge severity-warning">🚫 AUTO BLOCK</span>`;
+  if (t === 'DETECTION_FAILED')       return `<span class="badge severity-warning">❓ UNKNOWN</span>`;
+  if (t === 'TICKET_ISSUED')          return `<span class="badge badge-blue">🎟️ TICKET</span>`;
+  if (t === 'PAYMENT_REMINDER')       return `<span class="badge badge-blue">💳 PAY</span>`;
+  if (t.startsWith('RENTAL_'))        return `<span class="badge badge-blue">🚗 RENTAL</span>`;
+  return `<span class="badge badge-blue">${t}</span>`;
+}
+
+async function loadAlerts(page = 1) {
+  currentPage = page;
+  const isRead   = document.getElementById('read-filter').value;
+  const severity = document.getElementById('severity-filter').value;
+  const type     = document.getElementById('type-input').value.trim();
+
+  const params = { page, limit: 20 };
+  if (isRead !== '') params.is_read  = isRead;
+  if (severity)      params.severity = severity;
+  if (type)          params.type     = type;
+
+  // Apply the quick filter chip
+  switch (activeQuickFilter) {
+    case 'stolen':           params.type = 'STOLEN_DETECTED'; break;
+    case 'enforcement':      params.type = 'ENFORCEMENT_HIT'; break;
+    case 'detection_failed': params.type = 'DETECTION_FAILED'; break;
+    case 'critical':         params.severity = 'CRITICAL'; break;
+    case 'unread':           params.is_read = false; break;
+    case 'all':              /* no extra filter */ break;
+  }
+
+  const tbody = document.getElementById('alerts-body');
+  tbody.innerHTML = '<tr class="loading-row"><td colspan="8"><span class="spinner"></span></td></tr>';
+
+  try {
+    const data = await Api.get('/alerts' + Api.buildQuery(params));
+    document.getElementById('alerts-count').textContent = `Alerts (${data.meta?.total ?? 0})`;
+
+    if (!data.data?.length) {
+      tbody.innerHTML = '<tr><td colspan="8" class="table-empty">No alerts found</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = data.data.map(a => {
+      const sev = (a.severity || 'INFO').toUpperCase();
+      let rowClass = '';
+      if (!a.is_read)            rowClass = 'alert-row-unread';
+      if (sev === 'CRITICAL')    rowClass = 'alert-row-critical';
+      else if (sev === 'WARNING' && !a.is_read) rowClass = 'alert-row-warning';
+
+      return `
+        <tr class="${rowClass}">
+          <td>${severityBadge(a.severity)}</td>
+          <td>${typeBadge(a.type)}</td>
+          <td style="max-width:340px">
+            ${a.title ? `<div style="font-weight:600;font-size:13px">${Fmt.truncate(a.title, 60)}</div>` : ''}
+            <div style="color:var(--text-secondary);font-size:12px">${Fmt.truncate(a.message, 120)}</div>
+          </td>
+          <td>
+            ${a.vehicle_plate
+              ? `<span class="mono" style="font-size:12px">${a.vehicle_plate}</span>`
+              : '<span style="color:var(--text-muted)">—</span>'}
+          </td>
+          <td style="font-size:12px;color:var(--text-secondary)">
+            ${a.gate_name ? Fmt.truncate(a.gate_name, 20) : '—'}
+          </td>
+          <td style="font-size:12px;color:var(--text-muted)">
+            ${a.user_id     ? '👤 User'  : ''}
+            ${a.admin_id    ? '🛡️ Admin' : ''}
+            ${!a.user_id && !a.admin_id ? 'System' : ''}
+          </td>
+          <td>${a.is_read ? statusBadge('TRUE') : statusBadge('FALSE')}</td>
+          <td style="color:var(--text-muted);font-size:12px">${Fmt.datetime(a.created_at)}</td>
+        </tr>`;
+    }).join('');
+
+    renderPagination('alerts-pagination', data.meta, loadAlerts);
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="8" class="table-empty">${err.message}</td></tr>`;
+    Toast.error(err.message);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => loadAlerts());
+</script>
+</body>
+</html>

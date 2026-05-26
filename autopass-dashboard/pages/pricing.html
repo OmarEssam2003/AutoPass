@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AutoPass — Pricing Rules</title>
+  <link rel="stylesheet" href="../css/dashboard.css"/>
+</head>
+<body>
+<div id="sidebar-container"></div>
+<div class="main">
+  <header class="topbar">
+    <span class="topbar-title">Pricing Rules</span>
+  </header>
+  <div class="page-content">
+    <div class="page-header">
+      <div class="page-header-left">
+        <h1>Pricing Rules</h1>
+        <p>Manage zone-level pricing per vehicle type.</p>
+      </div>
+      <button class="btn btn-primary" onclick="openCreate()">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/></svg>
+        New Rule
+      </button>
+    </div>
+
+    <div class="table-card">
+      <div class="table-card-header">
+        <span class="table-card-title" id="pricing-count">Pricing Rules</span>
+        <div class="table-filters">
+          <input class="filter-input" type="text" id="type-input" placeholder="Vehicle type…"/>
+          <select class="filter-select" id="zone-filter">
+            <option value="">All zones</option>
+          </select>
+          <select class="filter-select" id="active-filter">
+            <option value="">All</option>
+            <option value="true">Active</option>
+            <option value="false">Inactive</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="loadPricing(1)">Apply</button>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Zone</th>
+              <th>Vehicle Type</th>
+              <th>Price (EGP)</th>
+              <th>Status</th>
+              <th>Created By</th>
+              <th>Created At</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="pricing-body">
+            <tr class="loading-row"><td colspan="7"><span class="spinner"></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination" id="pricing-pagination"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Create Modal -->
+<div class="modal-overlay" id="create-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">New Pricing Rule</span>
+      <button class="modal-close" onclick="Modal.close('create-modal')">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label class="form-label">Zone *</label>
+          <select class="form-select" id="c-zone"></select>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Vehicle Type *</label>
+          <input class="form-input" type="text" id="c-vtype" placeholder="e.g. Sedan, SUV, Truck"/>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Price (EGP) *</label>
+          <input class="form-input" type="number" id="c-price" step="0.01" min="0" placeholder="e.g. 25.00"/>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="Modal.close('create-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="createRule()">Create Rule</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Update Pricing Rule</span>
+      <button class="modal-close" onclick="Modal.close('edit-modal')">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="e-id"/>
+      <div class="form-grid">
+        <div class="form-group full">
+          <label class="form-label">Price (EGP) *</label>
+          <input class="form-input" type="number" id="e-price" step="0.01" min="0"/>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Status</label>
+          <select class="form-select" id="e-active">
+            <option value="true">Active</option>
+            <option value="false">Inactive</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="Modal.close('edit-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveRule()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/sidebar.js"></script>
+<script src="../js/dashboard.js"></script>
+<script>
+let currentPage = 1;
+
+async function loadZones() {
+  try {
+    const data  = await Api.get('/zones?limit=100');
+    const zones = data.data || [];
+
+    document.getElementById('c-zone').innerHTML =
+      zones.map(z => `<option value="${z.zone_id}">${z.zone_name}</option>`).join('');
+
+    const filterSel = document.getElementById('zone-filter');
+    zones.forEach(z => {
+      const opt = document.createElement('option');
+      opt.value       = z.zone_id;
+      opt.textContent = z.zone_name;
+      filterSel.appendChild(opt);
+    });
+  } catch (err) {
+    console.error('Failed to load zones:', err.message);
+  }
+}
+
+async function loadPricing(page = 1) {
+  currentPage = page;
+  const vtype    = document.getElementById('type-input').value.trim();
+  const zoneId   = document.getElementById('zone-filter').value;
+  const isActive = document.getElementById('active-filter').value;
+
+  const params = { page, limit: 20 };
+  if (vtype)    params.vehicle_type = vtype;
+  if (zoneId)   params.zone_id      = zoneId;
+  if (isActive) params.is_active    = isActive;
+
+  const tbody = document.getElementById('pricing-body');
+  tbody.innerHTML = '<tr class="loading-row"><td colspan="7"><span class="spinner"></span></td></tr>';
+
+  try {
+    const data = await Api.get('/pricing-rules' + Api.buildQuery(params));
+    document.getElementById('pricing-count').textContent =
+      `Pricing Rules (${data.meta?.total ?? 0})`;
+
+    if (!data.data?.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="table-empty">No pricing rules found</td></tr>';
+      renderPagination('pricing-pagination', data.meta, loadPricing);
+      return;
+    }
+
+    tbody.innerHTML = data.data.map(r => {
+      const createdBy = (r.created_by_first_name && r.created_by_last_name)
+        ? `${r.created_by_first_name} ${r.created_by_last_name}`
+        : '—';
+      return `
+        <tr>
+          <td style="font-weight:500">${r.zone_name || '—'}</td>
+          <td>${r.vehicle_type}</td>
+          <td><strong>${Fmt.currency(parseFloat(r.price))}</strong></td>
+          <td>${r.is_active ? statusBadge('ACTIVE') : statusBadge('INACTIVE')}</td>
+          <td style="font-size:12px;color:var(--text-secondary)">${createdBy}</td>
+          <td style="color:var(--text-muted);font-size:12px">${Fmt.datetime(r.created_at)}</td>
+          <td>
+            <div style="display:flex;gap:4px">
+              <button class="btn btn-ghost btn-sm"
+                onclick='openEdit(${JSON.stringify(r).replace(/'/g,"&#39;")})'>Edit</button>
+              <button class="btn btn-ghost btn-sm" style="color:var(--red)"
+                onclick="deleteRule('${r.rule_id}','${r.zone_name}','${r.vehicle_type}')">Del</button>
+            </div>
+          </td>
+        </tr>`;
+    }).join('');
+
+    renderPagination('pricing-pagination', data.meta, loadPricing);
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7" class="table-empty">${err.message}</td></tr>`;
+    Toast.error(err.message);
+  }
+}
+
+function openCreate() {
+  document.getElementById('c-vtype').value = '';
+  document.getElementById('c-price').value = '';
+  Modal.open('create-modal');
+}
+
+async function createRule() {
+  const zone_id      = document.getElementById('c-zone').value;
+  const vehicle_type = document.getElementById('c-vtype').value.trim();
+  const price        = parseFloat(document.getElementById('c-price').value);
+
+  if (!zone_id || !vehicle_type || isNaN(price)) {
+    Toast.warning('Zone, vehicle type, and price are required.');
+    return;
+  }
+  try {
+    await Api.post('/pricing-rules', { zone_id, vehicle_type, price });
+    Toast.success('Pricing rule created.');
+    Modal.close('create-modal');
+    loadPricing(1);
+  } catch (err) {
+    Toast.error(err.message);
+  }
+}
+
+function openEdit(r) {
+  document.getElementById('e-id').value     = r.rule_id;
+  document.getElementById('e-price').value  = parseFloat(r.price) || '';
+  document.getElementById('e-active').value = String(r.is_active);
+  Modal.open('edit-modal');
+}
+
+async function saveRule() {
+  const id        = document.getElementById('e-id').value;
+  const price     = parseFloat(document.getElementById('e-price').value);
+  const is_active = document.getElementById('e-active').value === 'true';
+
+  if (isNaN(price)) {
+    Toast.warning('Price is required.');
+    return;
+  }
+  try {
+    await Api.put(`/pricing-rules/${id}`, { price, is_active });
+    Toast.success('Pricing rule updated.');
+    Modal.close('edit-modal');
+    loadPricing(currentPage);
+  } catch (err) {
+    Toast.error(err.message);
+  }
+}
+
+function deleteRule(id, zone, vtype) {
+  confirmAction(
+    'Delete Pricing Rule',
+    `Delete pricing rule for "${vtype}" in zone "${zone}"? This cannot be undone.`,
+    async () => {
+      try {
+        await Api.delete(`/pricing-rules/${id}`);
+        Toast.success('Pricing rule deleted.');
+        loadPricing(currentPage);
+      } catch (err) { Toast.error(err.message); }
+    }
+  );
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadZones();
+  loadPricing();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AutoPass — Admins</title>
+  <link rel="stylesheet" href="../css/dashboard.css"/>
+</head>
+<body>
+<div id="sidebar-container"></div>
+<div class="main">
+  <header class="topbar">
+    <span class="topbar-title">Admins</span>
+  </header>
+  <div class="page-content">
+    <div class="page-header">
+      <div class="page-header-left">
+        <h1>Admins</h1>
+        <p>Manage admin accounts and access levels.</p>
+      </div>
+      <button class="btn btn-primary" onclick="openCreate()">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/></svg>
+        New Admin
+      </button>
+    </div>
+
+    <div class="table-card">
+      <div class="table-card-header">
+        <span class="table-card-title" id="admins-count">Admins</span>
+        <div class="table-filters">
+          <select class="filter-select" id="level-filter">
+            <option value="">All levels</option>
+            <option value="SUPER_ADMIN">Super Admin</option>
+            <option value="SECURITY_ADMIN">Security Admin</option>
+            <option value="FINANCE_ADMIN">Finance Admin</option>
+            <option value="OPERATOR">Operator</option>
+          </select>
+          <select class="filter-select" id="active-filter">
+            <option value="">All</option>
+            <option value="true">Active</option>
+            <option value="false">Inactive</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="loadAdmins(1)">Apply</button>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Level</th>
+              <th>Phone</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="admins-body">
+            <tr class="loading-row"><td colspan="7"><span class="spinner"></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination" id="admins-pagination"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Create Admin Modal -->
+<div class="modal-overlay" id="create-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">New Admin</span>
+      <button class="modal-close" onclick="Modal.close('create-modal')"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">First Name *</label>
+          <input class="form-input" type="text" id="c-fname"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Last Name *</label>
+          <input class="form-input" type="text" id="c-lname"/>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Email *</label>
+          <input class="form-input" type="email" id="c-email"/>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Password *</label>
+          <input class="form-input" type="password" id="c-password" placeholder="Min 8 characters"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Admin Level *</label>
+          <select class="form-select" id="c-level">
+            <option value="OPERATOR">Operator</option>
+            <option value="SECURITY_ADMIN">Security Admin</option>
+            <option value="FINANCE_ADMIN">Finance Admin</option>
+            <option value="SUPER_ADMIN">Super Admin</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Phone</label>
+          <input class="form-input" type="text" id="c-phone" placeholder="Optional"/>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="Modal.close('create-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="createAdmin()">Create Admin</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Admin Modal -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Update Admin</span>
+      <button class="modal-close" onclick="Modal.close('edit-modal')"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="e-id"/>
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">First Name</label>
+          <input class="form-input" type="text" id="e-fname"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Last Name</label>
+          <input class="form-input" type="text" id="e-lname"/>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Email</label>
+          <input class="form-input" type="email" id="e-email"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Admin Level</label>
+          <select class="form-select" id="e-level">
+            <option value="OPERATOR">Operator</option>
+            <option value="SECURITY_ADMIN">Security Admin</option>
+            <option value="FINANCE_ADMIN">Finance Admin</option>
+            <option value="SUPER_ADMIN">Super Admin</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Active</label>
+          <select class="form-select" id="e-active">
+            <option value="true">Active</option>
+            <option value="false">Inactive</option>
+          </select>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Phone</label>
+          <input class="form-input" type="text" id="e-phone"/>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="Modal.close('edit-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveAdmin()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/sidebar.js"></script>
+<script src="../js/dashboard.js"></script>
+<script>
+let currentPage = 1;
+
+const levelBadge = (level) => {
+  const map = { SUPER_ADMIN: 'badge-red', SECURITY_ADMIN: 'badge-amber', FINANCE_ADMIN: 'badge-blue', OPERATOR: 'badge-grey' };
+  return `<span class="badge ${map[level] || 'badge-grey'}">${(level || '').replace('_', ' ')}</span>`;
+};
+
+async function loadAdmins(page = 1) {
+  currentPage = page;
+  const level    = document.getElementById('level-filter').value;
+  const isActive = document.getElementById('active-filter').value;
+
+  const params = { page, limit: 20 };
+  if (level)    params.admin_level = level;
+  if (isActive) params.is_active   = isActive;
+
+  const tbody = document.getElementById('admins-body');
+  tbody.innerHTML = '<tr class="loading-row"><td colspan="7"><span class="spinner"></span></td></tr>';
+
+  try {
+    const data = await Api.get('/admins' + Api.buildQuery(params));
+    document.getElementById('admins-count').textContent = `Admins (${data.meta?.total ?? 0})`;
+
+    if (!data.data?.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="table-empty">No admins found</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = data.data.map(a => `
+      <tr>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="admin-avatar" style="width:28px;height:28px;font-size:11px">${Fmt.initials(a.first_name, a.last_name)}</div>
+            <span style="font-weight:500">${a.first_name} ${a.last_name}</span>
+          </div>
+        </td>
+        <td style="color:var(--text-secondary)">${a.email}</td>
+        <td>${levelBadge(a.admin_level)}</td>
+        <td style="color:var(--text-secondary)">${a.phone_number || '—'}</td>
+        <td>${a.is_active ? statusBadge('ACTIVE') : statusBadge('INACTIVE')}</td>
+        <td style="color:var(--text-muted)">${Fmt.date(a.created_at)}</td>
+        <td>
+          <div style="display:flex;gap:4px">
+            <button class="btn btn-ghost btn-sm" onclick='openEdit(${JSON.stringify(a).replace(/'/g,"&#39;")})'>Edit</button>
+            <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteAdmin('${a.admin_id}','${a.first_name} ${a.last_name}')">Del</button>
+          </div>
+        </td>
+      </tr>`).join('');
+
+    renderPagination('admins-pagination', data.meta, loadAdmins);
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7" class="table-empty">${err.message}</td></tr>`;
+    Toast.error(err.message);
+  }
+}
+
+function openCreate() { Modal.open('create-modal'); }
+
+async function createAdmin() {
+  const body = {
+    first_name:   document.getElementById('c-fname').value.trim(),
+    last_name:    document.getElementById('c-lname').value.trim(),
+    email:        document.getElementById('c-email').value.trim(),
+    password:     document.getElementById('c-password').value,
+    admin_level:  document.getElementById('c-level').value,
+    phone_number: document.getElementById('c-phone').value.trim() || undefined,
+  };
+  if (!body.first_name || !body.last_name || !body.email || !body.password) {
+    Toast.warning('First name, last name, email, and password are required.');
+    return;
+  }
+  try {
+    await Api.post('/admins', body);
+    Toast.success('Admin created successfully.');
+    Modal.close('create-modal');
+    loadAdmins(1);
+  } catch (err) { Toast.error(err.message); }
+}
+
+function openEdit(a) {
+  document.getElementById('e-id').value     = a.admin_id;
+  document.getElementById('e-fname').value  = a.first_name;
+  document.getElementById('e-lname').value  = a.last_name;
+  document.getElementById('e-email').value  = a.email;
+  document.getElementById('e-level').value  = a.admin_level;
+  document.getElementById('e-active').value = String(a.is_active);
+  document.getElementById('e-phone').value  = a.phone_number || '';
+  Modal.open('edit-modal');
+}
+
+async function saveAdmin() {
+  const id   = document.getElementById('e-id').value;
+  const body = {
+    first_name:   document.getElementById('e-fname').value.trim(),
+    last_name:    document.getElementById('e-lname').value.trim(),
+    email:        document.getElementById('e-email').value.trim(),
+    admin_level:  document.getElementById('e-level').value,
+    is_active:    document.getElementById('e-active').value === 'true',
+    phone_number: document.getElementById('e-phone').value.trim() || undefined,
+  };
+  try {
+    await Api.put(`/admins/${id}`, body);
+    Toast.success('Admin updated.');
+    Modal.close('edit-modal');
+    loadAdmins(currentPage);
+  } catch (err) { Toast.error(err.message); }
+}
+
+function deleteAdmin(id, name) {
+  confirmAction('Delete Admin', `Are you sure you want to delete admin "${name}"? This cannot be undone.`, async () => {
+    try {
+      await Api.delete(`/admins/${id}`);
+      Toast.success('Admin deleted.');
+      loadAdmins(currentPage);
+    } catch (err) { Toast.error(err.message); }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => loadAdmins());
+</script>
+</body>
+</html>

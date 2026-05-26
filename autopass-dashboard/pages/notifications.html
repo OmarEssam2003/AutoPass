@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AutoPass — Notifications</title>
+  <link rel="stylesheet" href="../css/dashboard.css"/>
+  <style>
+    /* ── Severity badges ─────────────────────────────────────────────────── */
+    .severity-critical { background: var(--red);    color: #fff; }
+    .severity-high     { background: var(--red);    color: #fff; opacity:.85; }
+    .severity-medium   { background: var(--amber);  color: #fff; }
+    .severity-low      { background: var(--blue);   color: #fff; }
+
+    /* ── Quick-filter chips (same as alerts.html) ────────────────────────── */
+    .quick-filters {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-secondary);
+      transition: all 0.15s;
+    }
+    .chip:hover  { background: var(--bg-hover); }
+    .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .chip-count  { font-size: 11px; padding: 1px 6px; border-radius: 999px; background: rgba(255,255,255,0.25); }
+
+    /* ── Row highlight states ────────────────────────────────────────────── */
+    .notif-row-critical { background: rgba(239, 68,  68,  0.06); }
+    .notif-row-high     { background: rgba(239, 68,  68,  0.04); }
+    .notif-row-unread   { background: var(--amber-soft); }
+
+    /* ── Mark-all button ─────────────────────────────────────────────────── */
+    .btn-mark-all {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+<div id="sidebar-container"></div>
+<div class="main">
+  <header class="topbar">
+    <span class="topbar-title">Notifications</span>
+    <div class="topbar-actions">
+      <button class="btn btn-secondary btn-sm btn-mark-all" id="mark-all-btn" onclick="markAllRead()">
+        <svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/>
+        </svg>
+        Mark all read
+      </button>
+    </div>
+  </header>
+
+  <div class="page-content">
+    <div class="page-header">
+      <div class="page-header-left">
+        <h1>Notifications</h1>
+        <p>System-generated events from the ANPR detection pipeline.</p>
+      </div>
+      <div id="unread-badge" style="align-self:flex-end;font-size:12px;color:var(--text-muted)"></div>
+    </div>
+
+    <!-- Quick filter chips -->
+    <div class="quick-filters">
+      <button class="chip active" data-filter="all"        onclick="setQuickFilter(this)">All</button>
+      <button class="chip"        data-filter="unread"     onclick="setQuickFilter(this)">🔵 Unread</button>
+      <button class="chip"        data-filter="critical"   onclick="setQuickFilter(this)">🔴 Critical</button>
+      <button class="chip"        data-filter="high"       onclick="setQuickFilter(this)">🟠 High</button>
+      <button class="chip"        data-filter="stolen"     onclick="setQuickFilter(this)">🚨 Stolen</button>
+      <button class="chip"        data-filter="enforcement"onclick="setQuickFilter(this)">⚠️ Enforcement</button>
+      <button class="chip"        data-filter="ticket"     onclick="setQuickFilter(this)">🎟️ Tickets</button>
+      <button class="chip"        data-filter="gate"       onclick="setQuickFilter(this)">🚧 Gate Offline</button>
+      <button class="chip"        data-filter="error"      onclick="setQuickFilter(this)">❗ System Errors</button>
+    </div>
+
+    <div class="table-card">
+      <div class="table-card-header">
+        <span class="table-card-title" id="notif-count">Notifications</span>
+        <div class="table-filters">
+          <select class="filter-select" id="read-filter">
+            <option value="">Read status</option>
+            <option value="false">Unread</option>
+            <option value="true">Read</option>
+          </select>
+          <select class="filter-select" id="severity-filter">
+            <option value="">Severity</option>
+            <option value="CRITICAL">Critical</option>
+            <option value="HIGH">High</option>
+            <option value="MEDIUM">Medium</option>
+            <option value="LOW">Low</option>
+          </select>
+          <select class="filter-select" id="type-filter">
+            <option value="">All types</option>
+            <option value="STOLEN_DETECTED">Stolen Detected</option>
+            <option value="ENFORCEMENT_HIT">Enforcement Hit</option>
+            <option value="TICKET_ISSUED">Ticket Issued</option>
+            <option value="PAYMENT_RECEIVED">Payment Received</option>
+            <option value="GATE_OFFLINE">Gate Offline</option>
+            <option value="SYSTEM_ERROR">System Error</option>
+          </select>
+          <select class="filter-select" id="gate-filter">
+            <option value="">All gates</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="loadNotifications(1)">Apply</button>
+        </div>
+      </div>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Severity</th>
+              <th>Type</th>
+              <th>Title / Message</th>
+              <th>Vehicle</th>
+              <th>Gate</th>
+              <th>Read</th>
+              <th>Read By</th>
+              <th>Created</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="notif-body">
+            <tr class="loading-row"><td colspan="9"><span class="spinner"></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination" id="notif-pagination"></div>
+    </div>
+  </div>
+</div>
+
+<script src="../js/sidebar.js"></script>
+<script src="../js/dashboard.js"></script>
+<script>
+let currentPage        = 1;
+let activeQuickFilter  = 'all';
+
+// ── Quick filter chip handler ─────────────────────────────────────────────────
+function setQuickFilter(btn) {
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  activeQuickFilter = btn.dataset.filter;
+  loadNotifications(1);
+}
+
+// ── Badge helpers ─────────────────────────────────────────────────────────────
+function severityBadge(sev) {
+  const s = (sev || 'LOW').toUpperCase();
+  const map = {
+    CRITICAL: `<span class="badge severity-critical">🔴 CRITICAL</span>`,
+    HIGH:     `<span class="badge severity-high">🟠 HIGH</span>`,
+    MEDIUM:   `<span class="badge severity-medium">🟡 MEDIUM</span>`,
+    LOW:      `<span class="badge severity-low">🔵 LOW</span>`,
+  };
+  return map[s] || `<span class="badge badge-blue">${s}</span>`;
+}
+
+function typeBadge(type) {
+  const t = (type || '').toUpperCase();
+  if (t === 'STOLEN_DETECTED')   return `<span class="badge severity-critical">🚨 STOLEN</span>`;
+  if (t === 'ENFORCEMENT_HIT')   return `<span class="badge severity-medium">⚠️ ENF HIT</span>`;
+  if (t === 'TICKET_ISSUED')     return `<span class="badge badge-blue">🎟️ TICKET</span>`;
+  if (t === 'PAYMENT_RECEIVED')  return `<span class="badge badge-blue">💳 PAYMENT</span>`;
+  if (t === 'GATE_OFFLINE')      return `<span class="badge severity-medium">🚧 GATE</span>`;
+  if (t === 'SYSTEM_ERROR')      return `<span class="badge severity-high">❗ SYS ERR</span>`;
+  return `<span class="badge badge-blue">${t}</span>`;
+}
+
+// ── Load gate list into filter dropdown ───────────────────────────────────────
+async function loadGateFilter() {
+  try {
+    const data = await Api.get('/gates?limit=100');
+    const sel  = document.getElementById('gate-filter');
+    (data.data || []).forEach(g => {
+      const opt = document.createElement('option');
+      opt.value       = g.gate_id;
+      opt.textContent = g.location_name;
+      sel.appendChild(opt);
+    });
+  } catch (_) { /* gates filter is optional */ }
+}
+
+// ── Load unread badge count ───────────────────────────────────────────────────
+async function loadUnreadBadge() {
+  try {
+    const data = await Api.get('/notifications/unread-count');
+    const n    = data?.data?.unread ?? 0;
+    const el   = document.getElementById('unread-badge');
+    if (n > 0) {
+      el.innerHTML = `<span class="badge severity-critical">${n} unread</span>`;
+    } else {
+      el.textContent = 'All caught up ✓';
+    }
+  } catch (_) {}
+}
+
+// ── Mark single notification as read ─────────────────────────────────────────
+async function markRead(id, btn) {
+  try {
+    btn.disabled    = true;
+    btn.textContent = '…';
+    await Api.patch(`/notifications/${id}/read`, {});
+    loadNotifications(currentPage);
+    loadUnreadBadge();
+  } catch (err) {
+    Toast.error(err.message);
+    btn.disabled    = false;
+    btn.textContent = 'Mark read';
+  }
+}
+
+// ── Mark all as read ──────────────────────────────────────────────────────────
+async function markAllRead() {
+  const btn = document.getElementById('mark-all-btn');
+  btn.disabled = true;
+  try {
+    await Api.patch('/notifications/mark-all-read', {});
+    Toast.success('All notifications marked as read.');
+    loadNotifications(currentPage);
+    loadUnreadBadge();
+  } catch (err) {
+    Toast.error(err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── Main load function ────────────────────────────────────────────────────────
+async function loadNotifications(page = 1) {
+  currentPage = page;
+
+  const isRead   = document.getElementById('read-filter').value;
+  const severity = document.getElementById('severity-filter').value;
+  const type     = document.getElementById('type-filter').value;
+  const gateId   = document.getElementById('gate-filter').value;
+
+  const params = { page, limit: 20 };
+  if (isRead !== '')  params.is_read   = isRead;
+  if (severity)       params.severity  = severity;
+  if (type)           params.type      = type;
+  if (gateId)         params.gate_id   = gateId;
+
+  // Apply quick filter chip — overrides manual filter selects
+  switch (activeQuickFilter) {
+    case 'unread':      params.is_read  = 'false';              delete params.type; break;
+    case 'critical':    params.severity = 'CRITICAL';           delete params.type; break;
+    case 'high':        params.severity = 'HIGH';               delete params.type; break;
+    case 'stolen':      params.type     = 'STOLEN_DETECTED';    delete params.severity; break;
+    case 'enforcement': params.type     = 'ENFORCEMENT_HIT';    delete params.severity; break;
+    case 'ticket':      params.type     = 'TICKET_ISSUED';      delete params.severity; break;
+    case 'gate':        params.type     = 'GATE_OFFLINE';       delete params.severity; break;
+    case 'error':       params.type     = 'SYSTEM_ERROR';       delete params.severity; break;
+    default: break;
+  }
+
+  const tbody = document.getElementById('notif-body');
+  tbody.innerHTML = '<tr class="loading-row"><td colspan="9"><span class="spinner"></span></td></tr>';
+
+  try {
+    const data = await Api.get('/notifications' + Api.buildQuery(params));
+    document.getElementById('notif-count').textContent =
+      `Notifications (${data.meta?.total ?? 0})`;
+
+    if (!data.data?.length) {
+      tbody.innerHTML = '<tr><td colspan="9" class="table-empty">No notifications found</td></tr>';
+      renderPagination('notif-pagination', data.meta, loadNotifications);
+      return;
+    }
+
+    tbody.innerHTML = data.data.map(n => {
+      const sev = (n.severity || 'LOW').toUpperCase();
+      let rowClass = '';
+      if (!n.is_read && sev === 'CRITICAL') rowClass = 'notif-row-critical';
+      else if (!n.is_read && sev === 'HIGH') rowClass = 'notif-row-high';
+      else if (!n.is_read) rowClass = 'notif-row-unread';
+
+      const markBtn = !n.is_read
+        ? `<button class="btn btn-ghost btn-sm" style="font-size:11px;padding:3px 8px"
+                   onclick="markRead('${n.notification_id}', this)">Mark read</button>`
+        : `<span style="color:var(--text-muted);font-size:11px">—</span>`;
+
+      return `
+        <tr class="${rowClass}">
+          <td>${severityBadge(n.severity)}</td>
+          <td>${typeBadge(n.notification_type)}</td>
+          <td style="max-width:320px">
+            ${n.title
+              ? `<div style="font-weight:600;font-size:13px">${Fmt.truncate(n.title, 55)}</div>`
+              : ''}
+            <div style="color:var(--text-secondary);font-size:12px">${Fmt.truncate(n.message, 110)}</div>
+          </td>
+          <td>
+            ${n.plate_number
+              ? `<span class="mono" style="font-size:12px">${n.plate_number}</span>
+                 ${n.make ? `<div style="font-size:11px;color:var(--text-muted)">${n.make} ${n.model || ''}</div>` : ''}`
+              : '<span style="color:var(--text-muted)">—</span>'}
+          </td>
+          <td style="font-size:12px;color:var(--text-secondary)">
+            ${n.gate_name ? Fmt.truncate(n.gate_name, 22) : '—'}
+          </td>
+          <td>${n.is_read ? statusBadge('TRUE') : statusBadge('FALSE')}</td>
+          <td style="font-size:11px;color:var(--text-muted)">
+            ${n.read_by ? `Admin` : '—'}
+            ${n.read_at ? `<div style="font-size:10px">${Fmt.datetime(n.read_at)}</div>` : ''}
+          </td>
+          <td style="color:var(--text-muted);font-size:12px">${Fmt.datetime(n.created_at)}</td>
+          <td>${markBtn}</td>
+        </tr>`;
+    }).join('');
+
+    renderPagination('notif-pagination', data.meta, loadNotifications);
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="9" class="table-empty">${err.message}</td></tr>`;
+    Toast.error(err.message);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadGateFilter();
+  loadUnreadBadge();
+  loadNotifications(1);
+});
+</script>
+</body>
+</html>
